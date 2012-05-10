@@ -189,7 +189,7 @@ applyUpost u' b                                = Branch oNothing (getU b <> oJus
 --   on @u@.  That is, to use @mapU f@ safely it must be the case that
 --   @f (act d u) == act d (f u)@.
 mapU :: (u -> u') -> DUBLTree d u b l -> DUBLTree d u' b l
-mapU f Empty             = Empty
+mapU _ Empty             = Empty
 mapU f (Leaf u l)        = Leaf (f u) l
 mapU f (Branch d u b ts) = Branch d (f <$> u) b (map (mapU f) ts)
 
