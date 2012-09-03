@@ -1,4 +1,4 @@
-name:                dubl-tree
+name:                dual-tree
 version:             0.1.0.0
 synopsis:            Rose trees with cached and accumulating monoidal annotations
 description:         XXX write me
@@ -12,8 +12,9 @@ cabal-version:       >=1.10
 
 library
   default-language:  Haskell2010
-  exposed-modules:   Data.Tree.DUBL
+  exposed-modules:   Data.Tree.DUAL
   build-depends:     base >= 4.3, 
                      semigroups >= 0.8 && < 0.9,
-                     monoid-extras >= 0.1 && < 0.2
+                     newtype >= 0.2 && < 0.3,
+                     monoid-extras >= 0.2 && < 0.3
   hs-source-dirs:    src
