@@ -45,7 +45,7 @@ module Data.Tree.DUAL.Internal
        , applyUpre, applyUpost
        , mapUNE, mapUU, mapU
 
-         -- * Accessors and destructors
+         -- * Accessors and eliminators
        , nonEmpty, getU, foldDUALNE, foldDUAL, flatten
 
        ) where
@@ -204,7 +204,8 @@ applyUpost u t = t <> leafU u
 annot :: (Semigroup u, Action d u) => a -> DUALTree d u a l -> DUALTree d u a l
 annot a = (over DUALTree . fmap) (pullU . Annot a)
 
--- | Apply a @d@ annotation at the root of a tree.
+-- | Apply a @d@ annotation at the root of a tree, transforming all
+--   @u@ annotations by the action of @d@.
 applyD :: (Semigroup d, Semigroup u, Action d u)
        => d -> DUALTree d u a l -> DUALTree d u a l
 applyD = act . DAct
@@ -246,7 +247,14 @@ mapUU f = over DUALTreeU (f *** mapUNE f)
 -- | Map a function over all the @u@ annotations in a DUAL-tree.  The
 --   function must be a monoid homomorphism, and must commute with the
 --   action of @d@ on @u@.  That is, to use @mapU f@ safely it must be
---   the case that @f (act d u) == act d (f u)@.
+--   the case that
+--
+--     * @f mempty == mempty@
+--
+--     * @f (u1 \<\> u2) == f u1 \<\> f u2@
+--
+--     * @f (act d u) == act d (f u)@
+--
 mapU :: (u -> u') -> DUALTree d u a l -> DUALTree d u' a l
 mapU = over DUALTree . fmap . mapUU
 
@@ -283,6 +291,8 @@ foldDUALNE  = foldDUALNE' (Option Nothing)
 --   as they occur in the tree, only as they accumulate at leaves.  If
 --   you do need access to @u@ or @d@ values, you can duplicate the
 --   values you need in the internal data nodes.
+--
+--   The result is @Nothing@ if and only if the tree is empty.
 foldDUAL :: (Semigroup d, Monoid d)
          => (d -> l -> r)          -- ^ Process a leaf datum along with the
                                    --   accumulation of @d@ values along the
