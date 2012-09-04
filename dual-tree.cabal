@@ -24,6 +24,7 @@ description:         Rose (n-ary) trees with both upwards- (/i.e./
 		     risk.
 license:             BSD3
 license-file:        LICENSE
+extra-source-files:  CHANGES
 author:              Brent Yorgey
 maintainer:          diagrams-discuss@googlegroups.com
 category:            Data
