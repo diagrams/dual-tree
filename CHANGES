@@ -1,3 +1,7 @@
+* 0.1.0.2: 28 March 2013
+
+  - bump upper bound to allow base-4.7
+
 * 0.1.0.1: 7 January 2013
 
   - bump upper bound to allow semigroups-0.9
