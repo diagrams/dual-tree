@@ -1,3 +1,7 @@
+* 0.1.0.3: 15 July 2013
+
+  - bump monoid-extras upper bound to allow 0.3
+
 * 0.1.0.2: 28 March 2013
 
   - bump upper bound to allow base-4.7
