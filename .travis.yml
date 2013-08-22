@@ -1,5 +1,6 @@
 language: haskell
 notifications:
+  email: false
   irc:
     channels:
       - irc.freenode.org#diagrams
