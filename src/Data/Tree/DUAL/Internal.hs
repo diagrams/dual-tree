@@ -1,10 +1,10 @@
+{-# LANGUAGE DeriveDataTypeable         #-}
+{-# LANGUAGE DeriveFunctor              #-}
+{-# LANGUAGE FlexibleContexts           #-}
+{-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses      #-}
-{-# LANGUAGE FlexibleInstances          #-}
-{-# LANGUAGE DeriveFunctor              #-}
 {-# LANGUAGE TypeOperators              #-}
-{-# LANGUAGE FlexibleContexts           #-}
-{-# LANGUAGE DeriveDataTypeable         #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -50,14 +50,12 @@ module Data.Tree.DUAL.Internal
 
        ) where
 
-import           Control.Arrow ((***))
-import           Data.Functor ((<$>))
-import           Data.List.NonEmpty (NonEmpty(..))
+import           Control.Arrow      ((***))
+import           Data.List.NonEmpty (NonEmpty (..))
 import qualified Data.List.NonEmpty as NEL
-import           Data.Maybe (fromMaybe, catMaybes, mapMaybe)
+import           Data.Maybe         (fromMaybe)
 import           Data.Monoid.Action
 import           Data.Semigroup
-import           Data.Tuple (swap)
 import           Data.Typeable
 
 import           Control.Newtype
