@@ -41,7 +41,7 @@ library
   exposed-modules:   Data.Tree.DUAL
                      Data.Tree.DUAL.Internal
   build-depends:     base >= 4.3 && < 4.8,
-                     semigroups >= 0.8 && < 0.10,
+                     semigroups >= 0.8 && < 0.12,
                      newtype >= 0.2 && < 0.3,
                      monoid-extras >= 0.2 && < 0.4
   hs-source-dirs:    src
