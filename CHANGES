@@ -1,3 +1,7 @@
+* 0.1.0.4: 26 September 2013
+
+  - allow semigroups-0.11
+
 * 0.1.0.3: 15 July 2013
 
   - bump monoid-extras upper bound to allow 0.3
