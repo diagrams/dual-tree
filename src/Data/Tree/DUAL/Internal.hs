@@ -281,16 +281,19 @@ foldDUALNE  = foldDUALNE' (Option Nothing)
     foldDUALNE' dacc lf lfU con down ann (Annot a t)
       = ann a (foldDUALNE' dacc lf lfU con down ann . snd . unpack $ t)
 
--- XXX fix this comment.  Careful about internal vs leaf d values.
 -- | Fold for DUAL-trees. It is given access to the internal and leaf
---   data, and the accumulated @d@ values at each leaf.  It is also
---   allowed to replace \"@u@-only\" leaves with a constant value.  In
---   particular, however, it is /not/ given access to any of the @u@
---   annotations, the idea being that those are used only for
---   /constructing/ trees.  It is also not given access to @d@ values
---   as they occur in the tree, only as they accumulate at leaves.  If
---   you do need access to @u@ or @d@ values, you can duplicate the
---   values you need in the internal data nodes.
+--   data, internal @d@ values, and the accumulated @d@ values at each
+--   leaf.  It is also allowed to replace \"@u@-only\" leaves with a
+--   constant value.  In particular, however, it is /not/ given access
+--   to any of the @u@ annotations, the idea being that those are used
+--   only for /constructing/ trees.  If you do need access to @u@
+--   values, you can duplicate the values you need in the internal
+--   data nodes.
+--
+--   Be careful not to mix up the @d@ values at internal nodes with
+--   the @d@ values at leaves.  Each @d@ value at a leaf satisfies the
+--   property that it is the 'mconcat' of all internal @d@ values
+--   along the path from the root to the leaf.
 --
 --   The result is @Nothing@ if and only if the tree is empty.
 foldDUAL :: (Semigroup d, Monoid d)
