@@ -267,28 +267,33 @@ foldDUALNE :: (Semigroup d, Monoid d)
                             --   path from the root
            -> r             -- ^ Replace @LeafU@ nodes
            -> (NonEmpty r -> r)  -- ^ Combine results at a branch node
+           -> (d -> r -> r)      -- ^ Process an internal d node
            -> (a -> r -> r)      -- ^ Process an internal datum
            -> DUALTreeNE d u a l -> r
 foldDUALNE  = foldDUALNE' (Option Nothing)
   where
-    foldDUALNE' dacc lf _   _   _   (Leaf _ l)  = lf (option mempty id dacc) l
-    foldDUALNE' _    _  lfU _   _   (LeafU _)   = lfU
-    foldDUALNE' dacc lf lfU con ann (Concat ts)
-      = con (NEL.map (foldDUALNE' dacc lf lfU con ann . snd . unpack) ts)
-    foldDUALNE' dacc lf lfU con ann (Act d t)
-      = foldDUALNE' (dacc <> (Option (Just d))) lf lfU con ann . snd . unpack $ t
-    foldDUALNE' dacc lf lfU con ann (Annot a t)
-      = ann a (foldDUALNE' dacc lf lfU con ann . snd . unpack $ t)
+    foldDUALNE' dacc lf _   _   _    _   (Leaf _ l)  = lf (option mempty id dacc) l
+    foldDUALNE' _    _  lfU _   _    _   (LeafU _)   = lfU
+    foldDUALNE' dacc lf lfU con down ann (Concat ts)
+      = con (NEL.map (foldDUALNE' dacc lf lfU con down ann . snd . unpack) ts)
+    foldDUALNE' dacc lf lfU con down ann (Act d t)
+      = down d (foldDUALNE' (dacc <> (Option (Just d))) lf lfU con down ann . snd . unpack $ t)
+    foldDUALNE' dacc lf lfU con down ann (Annot a t)
+      = ann a (foldDUALNE' dacc lf lfU con down ann . snd . unpack $ t)
 
 -- | Fold for DUAL-trees. It is given access to the internal and leaf
---   data, and the accumulated @d@ values at each leaf.  It is also
---   allowed to replace \"@u@-only\" leaves with a constant value.  In
---   particular, however, it is /not/ given access to any of the @u@
---   annotations, the idea being that those are used only for
---   /constructing/ trees.  It is also not given access to @d@ values
---   as they occur in the tree, only as they accumulate at leaves.  If
---   you do need access to @u@ or @d@ values, you can duplicate the
---   values you need in the internal data nodes.
+--   data, internal @d@ values, and the accumulated @d@ values at each
+--   leaf.  It is also allowed to replace \"@u@-only\" leaves with a
+--   constant value.  In particular, however, it is /not/ given access
+--   to any of the @u@ annotations, the idea being that those are used
+--   only for /constructing/ trees.  If you do need access to @u@
+--   values, you can duplicate the values you need in the internal
+--   data nodes.
+--
+--   Be careful not to mix up the @d@ values at internal nodes with
+--   the @d@ values at leaves.  Each @d@ value at a leaf satisfies the
+--   property that it is the 'mconcat' of all internal @d@ values
+--   along the path from the root to the leaf.
 --
 --   The result is @Nothing@ if and only if the tree is empty.
 foldDUAL :: (Semigroup d, Monoid d)
@@ -297,12 +302,13 @@ foldDUAL :: (Semigroup d, Monoid d)
                                    --   path from the root
          -> r                      -- ^ Replace @u@-only nodes
          -> (NonEmpty r -> r)      -- ^ Combine results at a branch node
+         -> (d -> r -> r)          -- ^ Process an internal d node
          -> (a -> r -> r)          -- ^ Process an internal datum
          -> DUALTree d u a l -> Maybe r
-foldDUAL _ _ _ _ (DUALTree (Option Nothing))
+foldDUAL _ _ _ _ _ (DUALTree (Option Nothing))
   = Nothing
-foldDUAL l u c a (DUALTree (Option (Just (DUALTreeU (_, t)))))
-  = Just $ foldDUALNE l u c a t
+foldDUAL l u c d a (DUALTree (Option (Just (DUALTreeU (_, t)))))
+  = Just $ foldDUALNE l u c d a t
 
 -- | A specialized fold provided for convenience: flatten a tree into
 --   a list of leaves along with their @d@ annotations, ignoring
@@ -313,4 +319,5 @@ flatten = fromMaybe []
             (\d l -> [(l, d)])
             []
             (concat . NEL.toList)
+            (flip const)
             (const id)
