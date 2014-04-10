@@ -4,8 +4,8 @@ synopsis:            Rose trees with cached and accumulating monoidal annotation
 description:         Rose (n-ary) trees with both upwards- (/i.e./
                      cached) and downwards-traveling (/i.e./
                      accumulating) monoidal annotations.  This is used
-                     as the core data structure underlying the
-                     @diagrams@ framework
+                     as the core data structure underlying
+                     the @diagrams@ framework
                      (<http://projects.haskell.org/diagrams>), but
                      potentially has other applications as well.
 		     .
