@@ -5,6 +5,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses      #-}
 {-# LANGUAGE TypeOperators              #-}
+{-# LANGUAGE TypeFamilies               #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -50,10 +51,13 @@ module Data.Tree.DUAL.Internal
 
        ) where
 
-import           Control.Arrow      ((***))
-import           Data.List.NonEmpty (NonEmpty (..))
-import qualified Data.List.NonEmpty as NEL
-import           Data.Maybe         (fromMaybe)
+import           Control.Applicative (Applicative(..), (<$>))
+import           Control.Arrow       ((***))
+import           Control.Lens        hiding (Action, over, act)
+import           Data.Foldable       (Foldable(..))
+import           Data.List.NonEmpty  (NonEmpty (..))
+import qualified Data.List.NonEmpty  as NEL
+import           Data.Maybe          (fromMaybe)
 import           Data.Monoid.Action
 import           Data.Semigroup
 import           Data.Typeable
@@ -92,6 +96,30 @@ instance (Semigroup d, Semigroup u, Action d u)
   act (DAct d) (Act d' t) = Act (d <> d') t
   act (DAct d) t          = Act d (pullU t)
 
+instance (Semigroup u, Action d u) => Plated (DUALTreeNE d u a l) where
+  plate = go.isoU
+    where go f (Concat xs) = Concat  <$> traverse f xs
+          go f (Act d t)   = Act d   <$> f t
+          go f (Annot a t) = Annot a <$> f t
+          go _ t = pure t
+
+instance Monoid d => Foldable (DUALTreeNE d u a) where
+  foldMap = foldMapOf traverse
+
+instance Monoid d => Traversable (DUALTreeNE d u a) where
+  traverse = itraversed
+
+instance Monoid d => FunctorWithIndex d (DUALTreeNE d u a)
+instance Monoid d => FoldableWithIndex d (DUALTreeNE d u a)
+instance Monoid d => TraversableWithIndex d (DUALTreeNE d u a) where
+  itraverse f = go mempty
+    where go i (Leaf u l)  = Leaf u  <$> f i l
+          go _ (LeafU u)   = pure     $  LeafU u
+          go i (Concat ts) = Concat  <$> traverse (go' i) ts
+          go i (Act d t)   = Act d   <$> go' (mappend i d) t
+          go i (Annot a t) = Annot a <$> go' i t
+          go' i = _Wrapped._2 %%~ go i
+
 ------------------------------------------------------------
 -- DUALTreeU
 ------------------------------------------------------------
@@ -105,6 +133,12 @@ instance Newtype (DUALTreeU d u a l) (u, DUALTreeNE d u a l) where
   pack   = DUALTreeU
   unpack = unDUALTreeU
 
+instance Wrapped (DUALTreeU d u a l) where
+  type Unwrapped (DUALTreeU d u a l) = (u, DUALTreeNE d u a l)
+  _Wrapped' = iso unDUALTreeU DUALTreeU
+
+instance Rewrapped (DUALTreeU d u a l) (DUALTreeU d' u' a' l')
+
 instance (Semigroup d, Semigroup u, Action d u)
     => Action (DAct d) (DUALTreeU d u a l) where
   act d = over DUALTreeU (act (unDAct d) *** act d)
@@ -116,6 +150,11 @@ pullU t@(LeafU u)                    = pack (u, t)
 pullU t@(Concat ts)                  = pack (sconcat . NEL.map (fst . unpack) $ ts, t)
 pullU t@(Act d (DUALTreeU (u,_)))    = pack (act d u, t)
 pullU t@(Annot _ (DUALTreeU (u, _))) = pack (u, t)
+
+-- | Isomorphism between 'DUALTreeU' and 'DUALTreeNE', the backwards direction
+--   being given by 'pullU'.
+isoU :: (Semigroup u, Action d u) => Iso' (DUALTreeU d u a l) (DUALTreeNE d u a l)
+isoU = iso (snd . unpack) pullU
 
 ------------------------------------------------------------
 -- DUALTree
@@ -152,6 +191,12 @@ newtype DUALTree d u a l = DUALTree { unDUALTree :: Option (DUALTreeU d u a l) }
 instance Newtype (DUALTree d u a l) (Option (DUALTreeU d u a l)) where
   pack   = DUALTree
   unpack = unDUALTree
+
+instance Wrapped (DUALTree d u a l) where
+  type Unwrapped (DUALTree d u a l) = Option (DUALTreeU d u a l)
+  _Wrapped' = iso unDUALTree DUALTree
+
+instance Rewrapped (DUALTree d u a l) (DUALTree d' u' a' l')
 
 instance (Semigroup u, Action d u) => Monoid (DUALTree d u a l) where
   mempty  = DUALTree mempty
