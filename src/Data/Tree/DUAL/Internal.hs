@@ -44,7 +44,7 @@ module Data.Tree.DUAL.Internal
 
          -- * Modifying DUAL-trees
        , applyUpre, applyUpost
-       , mapUNE, mapUU, mapU
+       , mapUNE, mapUU, mapU, mapDNE, mapDU, mapD
 
          -- * Accessors and eliminators
        , nonEmpty, getU, foldDUALNE, foldDUAL, flatten
@@ -300,6 +300,26 @@ mapUU f = over DUALTreeU (f *** mapUNE f)
 --
 mapU :: (u -> u') -> DUALTree d u a l -> DUALTree d u' a l
 mapU = over DUALTree . fmap . mapUU
+
+-- | Map a function over all the @d@ annotations in a DUAL-tree. The
+--   function must not change the action of @d@ on @u@. That is, to use
+--   @mapD f@ safely it must be the case that
+--
+--     * @act d u == act (f d) u@
+mapD :: (d -> d') -> DUALTree d u a l -> DUALTree d' u a l
+mapD = over DUALTree . fmap . mapDU
+
+-- | Like 'mapD' but for 'DUALTreeU'.
+mapDU :: (d -> d') -> DUALTreeU d u a l -> DUALTreeU d' u a l
+mapDU = over DUALTreeU . fmap  . mapDNE
+
+-- | Like 'mapDNE' but for 'DualTreeNE'.
+mapDNE :: (d -> d') -> DUALTreeNE d u a l -> DUALTreeNE d' u a l
+mapDNE _ (Leaf u l)  = Leaf u l
+mapDNE _ (LeafU u)   = LeafU u
+mapDNE f (Concat ts) = Concat    $ fmap (mapDU f) ts
+mapDNE f (Act d t)   = Act (f d) $ mapDU f t
+mapDNE f (Annot a t) = Annot a   $ mapDU f t
 
 ------------------------------------------------------------
 -- Folds

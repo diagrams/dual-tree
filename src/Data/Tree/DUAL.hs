@@ -78,7 +78,7 @@ module Data.Tree.DUAL
 
          -- * Modifying DUAL-trees
        , applyUpre, applyUpost
-       , mapU
+       , mapU, mapD
 
          -- * Accessors and eliminators
        , getU, foldDUAL, flatten
