@@ -103,11 +103,17 @@ instance (Semigroup u, Action d u) => Plated (DUALTreeNE d u a l) where
           go f (Annot a t) = Annot a <$> f t
           go _ t = pure t
 
-instance Monoid d => Foldable (DUALTreeNE d u a) where
+instance Foldable (DUALTreeNE d u a) where
   foldMap = foldMapOf traverse
 
-instance Monoid d => Traversable (DUALTreeNE d u a) where
-  traverse = itraversed
+instance Traversable (DUALTreeNE d u a) where
+  traverse f = go
+    where go (Leaf u l)  = Leaf u  <$> f l
+          go (LeafU u)   = pure     $  LeafU u
+          go (Concat ts) = Concat  <$> traverse go' ts
+          go (Act d t)   = Act d   <$> go' t
+          go (Annot a t) = Annot a <$> go' t
+          go' = _Wrapped._2 %%~ go
 
 instance Monoid d => FunctorWithIndex d (DUALTreeNE d u a)
 instance Monoid d => FoldableWithIndex d (DUALTreeNE d u a)
