@@ -43,7 +43,7 @@ library
   build-depends:     base >= 4.3 && < 4.9,
                      semigroups >= 0.8 && < 0.17,
                      newtype >= 0.2 && < 0.3,
-                     monoid-extras >= 0.2 && < 0.4
+                     monoid-extras >= 0.2 && < 0.5
   hs-source-dirs:    src
   other-extensions:  GeneralizedNewtypeDeriving,
                      MultiParamTypeClasses,
