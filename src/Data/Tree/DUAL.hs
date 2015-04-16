@@ -69,20 +69,20 @@
 -----------------------------------------------------------------------------
 
 module Data.Tree.DUAL
-       (
-         -- * DUAL-trees
-         DUALTree
+  (
+    -- * DUAL-trees
+    DUALTree
 
-         -- * Constructing DUAL-trees
-       , empty, leaf, leafU, annot, applyD
+    -- * Constructing DUAL-trees
+  , leaf, annot, down
 
-         -- * Modifying DUAL-trees
-       , applyUpre, applyUpost
-       , mapU
+    -- * Modifying DUAL-trees
+  , _u, mapU
 
-         -- * Accessors and eliminators
-       , getU, foldDUAL, flatten
+    -- * Accessors and eliminators
+  , getU, foldDUAL, flatten
 
-       ) where
+  ) where
 
 import Data.Tree.DUAL.Internal
+
