@@ -2,7 +2,7 @@
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Data.Tree.DUAL
--- Copyright   :  (c) 2011-2012 Brent Yorgey
+-- Copyright   :  (c) 2011-2015 Brent Yorgey
 -- License     :  BSD-style (see LICENSE)
 -- Maintainer  :  diagrams-discuss@googlegroups.com
 --
@@ -17,24 +17,13 @@
 -- of monoidal annotations, one (of type @u@) travelling \"up\" the
 -- tree and one (of type @d@) traveling \"down\".
 --
--- Specifically, there are five types of nodes:
+-- Specifically, there are three types of nodes:
 --
---   * Leaf nodes which contain a data value of type @l@ and an
---     annotation of type @u@.  The annotation represents information
---     about a tree that should be accumulated (/e.g./ number of
---     leaves, some sort of \"weight\", /etc./).  If you are familiar
---     with finger trees
---     (<http://www.soi.city.ac.uk/~ross/papers/FingerTree.html>,
---     <http://hackage.haskell.org/package/fingertree>), it is the
---     same idea.
---
---   * There is also a special type of leaf node which contains only a
---     @u@ value, and no data. This allows cached @u@ values to be
---     \"modified\" by inserting extra annotations.
+--   * Leaf nodes which contain a data value of type @l@.
 --
 --   * Branch nodes, containing a list of subtrees.
 --
---   * Internal nodes with a value of type @d@.  @d@ may have an
+--   * Internal nodes with a value of type @d@. @d@ may have an
 --     /action/ on @u@ (see the 'Action' type class, defined in
 --     "Data.Monoid.Action" from the @monoid-extras@ package).
 --     Semantically speaking, applying a @d@ annotation to a tree
@@ -44,27 +33,33 @@
 --     constant time.
 --
 --   * Internal nodes with data values of type @a@, possibly of a
---     different type than those in the leaves.  These are just \"along
+--     different type than those in the leaves. These are just \"along
 --     for the ride\" and are unaffected by @u@ and @d@ annotations.
+--
+--   The @u@ annotation represents information about a tree that should
+--   be accumulated (/e.g./ number of leaves, some sort of \"weight\",
+--   /etc./).  If you are familiar with finger trees
+--   (<http://www.soi.city.ac.uk/~ross/papers/FingerTree.html>,
+--   <http://hackage.haskell.org/package/fingertree>), it is the same
+--   idea.
 --
 -- There are two critical points to note about @u@ and @d@ annotations:
 --
 --   * The combined @u@ annotation for an entire tree is always cached
---     at the root and available in constant (amortized) time.
+--     at the root and available in constant time.
 --
 --   * The 'mconcat' of all the @d@ annotations along the path from
 --     the root to each leaf is available along with the leaf during a
 --     fold operation.
 --
 -- A fold over a @DUALTree@ is given access to the internal and leaf
--- data, and the accumulated @d@ values at each leaf.  It is also
--- allowed to replace \"@u@-only\" leaves with a constant value.  In
--- particular, however, it is /not/ given access to any of the @u@
--- annotations, the idea being that those are used only for
--- /constructing/ trees.  It is also not given access to @d@ values as
--- they occur in the tree, only as they accumulate at leaves.  If you
--- do need access to @u@ or @d@ values, you can duplicate the values
--- you need in the internal data nodes.
+-- data, and the accumulated @d@ values at each leaf. In particular,
+-- however, it is /not/ given access to any of the @u@ annotations, the
+-- idea being that those are used only for /constructing/ trees. It is
+-- also not given access to @d@ values as they occur in the tree, only
+-- as they accumulate at leaves. If you do need access to @u@ or @d@
+-- values, you can duplicate the values you need in the internal data
+-- nodes.
 --
 -----------------------------------------------------------------------------
 

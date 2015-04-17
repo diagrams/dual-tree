@@ -1,16 +1,16 @@
 {-# LANGUAGE DeriveDataTypeable         #-}
-{-# LANGUAGE LambdaCase         #-}
 {-# LANGUAGE DeriveFunctor              #-}
 {-# LANGUAGE FlexibleContexts           #-}
 {-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE LambdaCase                 #-}
 {-# LANGUAGE MultiParamTypeClasses      #-}
 {-# LANGUAGE TypeOperators              #-}
 
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Data.Tree.DUAL.Internal
--- Copyright   :  (c) 2011-2012 Brent Yorgey
+-- Copyright   :  (c) 2011-2015 Brent Yorgey
 -- License     :  BSD-style (see LICENSE)
 -- Maintainer  :  diagrams-discuss@googlegroups.com
 --
@@ -20,17 +20,14 @@
 -- "Data.Tree.DUAL".
 --
 -- The main things exported by this module which are not exported from
--- "Data.Tree.DUAL" are two extra types used in the implementation of
--- 'DUALTree', along with functions for manipulating them.  A type of
--- /non-empty/ trees, 'DUALTreeNE', is defined, as well as the type
--- 'DUALTreeU' which represents a non-empty tree paired with a cached
--- @u@ annotation.  'DUALTreeNE' and 'DUALTreeU' are mutually
--- recursive, so that recursive tree nodes are interleaved with cached
--- @u@ annotations.  'DUALTree' is defined by just wrapping
--- 'DUALTreeU' in 'Option'.  This method has the advantage that the
--- type system enforces the invariant that there is only one
--- representation for the empty tree.  It also allows us to get away
--- with only 'Semigroup' constraints in many places.
+-- "Data.Tree.DUAL" is one extra type used in the implementation of
+-- 'DUALTree', along with functions for manipulating them. A type of
+-- /non-empty/ trees without up annotations, 'DALTree', is defined. A
+-- 'DUALTree' is a 'DALTree' with a top-level @u@ annotation along with
+-- a possible 'EmptyDUAL'. This method has the advantage that the type
+-- system enforces the invariant that there is only one representation
+-- for the empty tree. It also allows us to get away with only
+-- 'Semigroup' constraints in many places.
 --
 -----------------------------------------------------------------------------
 
@@ -55,14 +52,14 @@ module Data.Tree.DUAL.Internal
 
   ) where
 
-import Control.Applicative
-import Data.Monoid.Action
-import Data.Semigroup
-import Data.Typeable
-import Data.Monoid.WithSemigroup
-import Control.DeepSeq
-import Data.Sequence
-import Data.Foldable as F (foldMap)
+import           Control.Applicative
+import           Control.DeepSeq
+import           Data.Foldable             as F (foldMap)
+import           Data.Monoid.Action
+import           Data.Monoid.WithSemigroup
+import           Data.Semigroup
+import           Data.Sequence
+import           Data.Typeable
 
 ------------------------------------------------------------------------
 -- DALTree
