@@ -1,6 +1,7 @@
 {-# LANGUAGE CPP                        #-}
 {-# LANGUAGE DeriveDataTypeable         #-}
 {-# LANGUAGE DeriveFunctor              #-}
+{-# LANGUAGE DeriveTraversable          #-}
 {-# LANGUAGE FlexibleContexts           #-}
 {-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE LambdaCase                 #-}
@@ -73,7 +74,7 @@ data DALTree d a l
   | Down   !d !(DALTree d a l) -- ^ @d@own-annotation
   | Annot  !a !(DALTree d a l) -- ^ @a@nnotation
   | Concat !(Seq (DALTree d a l)) -- ^ n-way branch
-  deriving (Functor, Typeable, Show, Eq)
+  deriving (Functor, Foldable, Traversable, Typeable, Show, Eq)
 
 instance Semigroup d => Semigroup (DALTree d a l) where
   Concat t1  <> Concat t2  = Concat (t1 <> t2)
@@ -121,7 +122,7 @@ instance (NFData d, NFData a, NFData l) => NFData (DALTree d a l) where
 data DUALTree d u a l
   = DUALTree !u !(DALTree d a l)
   | EmptyDUAL
-  deriving (Functor, Typeable, Show, Eq)
+  deriving (Functor, Foldable, Traversable, Typeable, Show, Eq)
 
 instance (Semigroup u, Semigroup d) => Semigroup (DUALTree d u a l) where
   DUALTree u1 t1 <> DUALTree u2 t2 = DUALTree (u1 <> u2) (t1 <> t2)
