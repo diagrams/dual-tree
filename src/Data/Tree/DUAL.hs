@@ -74,10 +74,10 @@ module Data.Tree.DUAL
     DUALTree
 
     -- * Constructing DUAL-trees
-  , leaf, annot, down
+  , leaf, leafU, annot, down
 
     -- * Modifying DUAL-trees
-  , _u, mapU
+  , _u, mapU, preapplyU, postapplyU
 
     -- * Accessors and eliminators
   , getU, foldDUAL, flatten
