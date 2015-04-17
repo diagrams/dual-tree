@@ -3,7 +3,6 @@
 {-# LANGUAGE DeriveFunctor              #-}
 {-# LANGUAGE FlexibleContexts           #-}
 {-# LANGUAGE FlexibleInstances          #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE LambdaCase                 #-}
 {-# LANGUAGE MultiParamTypeClasses      #-}
 {-# LANGUAGE TypeOperators              #-}
@@ -150,14 +149,14 @@ _u _ _              = pure EmptyDUAL
 leaf :: u -> l -> DUALTree d u a l
 leaf u l = DUALTree u (Leaf l)
 
--- | Construct a leaf node from a @u@ annotation along with a leaf.
+-- | Construct an DUALTree that only contains a @u@ annotation.
 leafU :: u -> DUALTree d u a l
 leafU u = DUALTree u (Concat mempty)
 
 -- | Add an internal data value at the root of a tree.  Note that this
 --   only works on /non-empty/ trees; on empty trees this function is
---   the identity.
-annot :: (Semigroup u, Action d u) => a -> DUALTree d u a l -> DUALTree d u a l
+--   the identity. O(1)
+annot :: a -> DUALTree d u a l -> DUALTree d u a l
 annot _ EmptyDUAL      = EmptyDUAL
 annot a (DUALTree u t) = DUALTree u (Annot a t)
 
@@ -174,17 +173,19 @@ getU :: DUALTree d u a l -> Maybe u
 getU (DUALTree u _) = Just u
 getU _              = Nothing
 
--- | Get the up annotation of a non-empty DUALTree.
+-- | Map over the @u@ annotation of a DUALTree.
 mapU :: (u -> u') -> DUALTree d u a l -> DUALTree d u' a l
 mapU f (DUALTree u t) = DUALTree (f u) t
 mapU _ _              = EmptyDUAL
 
--- | Get the up annotation of a non-empty DUALTree.
+-- | Apply a @u@ annotation of a DUALTree on the left. Makes a 'leafU'
+--   for an empty tree.
 preapplyU :: Semigroup u => u -> DUALTree d u a l -> DUALTree d u a l
 preapplyU u (DUALTree u' t) = DUALTree (u' <> u) t
 preapplyU u _               = leafU u
 
--- | Get the up annotation of a non-empty DUALTree.
+-- | Apply an @u@ annotation of a DUALTree on the right. Makes a 'leafU'
+--   for an empty tree.
 postapplyU :: Semigroup u => u -> DUALTree d u a l -> DUALTree d u a l
 postapplyU u (DUALTree u' t) = DUALTree (u <> u') t
 postapplyU u _               = leafU u
@@ -193,10 +194,12 @@ postapplyU u _               = leafU u
 -- Folds
 ------------------------------------------------------------
 
--- | Fold a dual tree using the
-foldDUAL :: (Monoid' d, Monoid r)
-         => (d -> l -> r)      -- ^ Process a leaf
-         -> (d -> a -> r -> r) -- ^ Process an anotation
+-- | Fold a dual tree for a monoidal result @r@. The @d@ annotations are
+--   accumilated from the top of the tree. Static @a@ annotations are
+--   acted on by the @d@ annotation accumlated up to that point.
+foldDUAL :: (Action d a, Monoid' d, Monoid r)
+         => (d -> l -> r) -- ^ Process a leaf
+         -> (a -> r -> r) -- ^ Process an anotation
          -> DUALTree d u a l
          -> r
 foldDUAL _  _  EmptyDUAL       = mempty
@@ -205,13 +208,13 @@ foldDUAL lF aF (DUALTree _ t0) = go mempty t0
     go d = \case
       Down d' t  -> go (d <> d') t
       Leaf l     -> lF d l
-      Annot a t  -> aF d a (go d t)
+      Annot a t  -> aF (act d a) (go d t)
       Concat ts  -> F.foldMap (go d) ts
 {-# INLINE foldDUAL #-}
 
 -- | A specialized fold provided for convenience: flatten a tree into
 --   a list of leaves along with their @d@ annotations, ignoring
 --   internal data values.
-flatten :: Monoid' d => DUALTree d u a l -> [(l, d)]
-flatten = foldDUAL (\d l -> [(l, d)]) (\_ _ r -> r)
+flatten :: (Action d a, Monoid' d) => DUALTree d u a l -> [(l, d)]
+flatten = foldDUAL (\d l -> [(l, d)]) (flip const)
 
