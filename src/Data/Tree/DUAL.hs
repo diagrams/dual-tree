@@ -75,7 +75,7 @@ module Data.Tree.DUAL
   , _u, mapU, preapplyU, postapplyU
 
     -- * Accessors and eliminators
-  , getU, foldDUAL, flatten
+  , getU, foldDUAL, foldDUAL', flatten
 
   ) where
 

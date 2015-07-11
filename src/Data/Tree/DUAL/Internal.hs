@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP                        #-}
+{-# LANGUAGE BangPatterns               #-}
 {-# LANGUAGE DeriveDataTypeable         #-}
 {-# LANGUAGE DeriveFunctor              #-}
 {-# LANGUAGE DeriveTraversable          #-}
@@ -42,6 +43,7 @@ module Data.Tree.DUAL.Internal
 
     -- * Folding DUAL-trees
   , foldDUAL
+  , foldDUAL'
   , flatten
 
     -- * Up annotations
@@ -73,14 +75,14 @@ data DALTree d a l
   = Leaf   !l                  -- ^ @l@eaf
   | Down   !d !(DALTree d a l) -- ^ @d@own-annotation
   | Annot  !a !(DALTree d a l) -- ^ @a@nnotation
-  | Concat !(Seq (DALTree d a l)) -- ^ n-way branch
+  | Concat (Seq (DALTree d a l)) -- ^ n-way branch
   deriving (Functor, Foldable, Traversable, Typeable, Show, Eq)
 
 instance Semigroup d => Semigroup (DALTree d a l) where
-  Concat t1  <> Concat t2  = Concat (t1 <> t2)
-  Concat t1  <> t2         = Concat (t1 |> t2)
-  t1         <> Concat t2  = Concat (t1 <| t2)
-  t1         <> t2         = Concat (fromList [t1,t2])
+  Concat t1 <> Concat t2  = Concat (t1 <> t2)
+  Concat t1 <> t2         = Concat (t1 |> t2)
+  t1        <> Concat t2  = Concat (t1 <| t2)
+  t1        <> t2         = Concat (fromList [t1,t2])
 
 instance (NFData d, NFData a, NFData l) => NFData (DALTree d a l) where
   rnf (Leaf l)    = rnf l
@@ -126,8 +128,8 @@ data DUALTree d u a l
 
 instance (Semigroup u, Semigroup d) => Semigroup (DUALTree d u a l) where
   DUALTree u1 t1 <> DUALTree u2 t2 = DUALTree (u1 <> u2) (t1 <> t2)
-  EmptyDUAL <> a = a
-  a <> EmptyDUAL = a
+  EmptyDUAL      <> a              = a
+  a              <> EmptyDUAL      = a
 
 instance (Semigroup u, Semigroup d) => Monoid (DUALTree d u a l) where
   mappend = (<>)
@@ -206,12 +208,43 @@ foldDUAL :: (Action d a, Monoid' d, Monoid r)
 foldDUAL _  _  EmptyDUAL       = mempty
 foldDUAL lF aF (DUALTree _ t0) = go mempty t0
   where
-    go d = \case
-      Down d' t  -> go (d <> d') t
-      Leaf l     -> lF d l
-      Annot a t  -> aF (act d a) (go d t)
-      Concat ts  -> F.foldMap (go d) ts
+    go !d = \case
+      Down d' t -> go (d <> d') t
+      Leaf l    -> lF d l
+      Annot a t -> aF (act d a) (go d t)
+      Concat ts -> F.foldMap (go d) ts
 {-# INLINE foldDUAL #-}
+
+-- | Similar to 'foldDUAL' but allows application of \partial\ down
+--   annotations. These allow application of parts of the down
+--   annotation that can be applied higher up the tree, the original
+--   down annotations are unaffected.
+foldDUAL'
+  :: (Action d a, Monoid' d, Monoid r)
+  => (d -> l -> r) -- ^ Process a leaf with total and local accumilation of down
+  -> (a -> r -> r) -- ^ Process an anotation
+  -> (d -> d -> p) -- ^ Given fully accumilated and partially
+                   --   accumilated down annotation, produce a partial
+                   --   down annotation @p@
+  -> (p -> r -> r) -- ^ Process a partial down anotation
+  -> DUALTree d u a l
+  -> r
+foldDUAL' _  _  _   _  EmptyDUAL       = mempty
+foldDUAL' lF aF mkP pF (DUALTree _ t0) = go mempty mempty t0
+  where
+    -- d is the total accumilated down annotations becfore the last Concat
+    -- w is the down annotations since the last Concat
+    -- dw is the total accumilated down annotations
+    -- p is the partial annotation since the last concat
+    -- at every Concat, the partial annotation is applied and w is reset
+    go !d w = \case
+      Down d' t -> go d (w <> d') t
+      Leaf l    -> pF p $ lF dw l
+      Annot a t -> aF (act dw a) (go d w t)
+      Concat ts -> pF p $ F.foldMap (go dw mempty) ts
+      where p  = mkP d w
+            dw = d <> w
+{-# INLINE foldDUAL' #-}
 
 -- | A specialized fold provided for convenience: flatten a tree into
 --   a list of leaves along with their @d@ annotations, ignoring
