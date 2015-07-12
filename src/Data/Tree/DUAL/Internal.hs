@@ -198,11 +198,11 @@ postapplyU u _               = leafU u
 ------------------------------------------------------------
 
 -- | Fold a dual tree for a monoidal result @r@. The @d@ annotations are
---   accumilated from the top of the tree. Static @a@ annotations are
---   acted on by the @d@ annotation accumlated up to that point.
+--   accumulated from the top of the tree. Static @a@ annotations are
+--   acted on by the @d@ annotation accumulated up to that point.
 foldDUAL :: (Action d a, Monoid' d, Monoid r)
          => (d -> l -> r) -- ^ Process a leaf
-         -> (a -> r -> r) -- ^ Process an anotation
+         -> (a -> r -> r) -- ^ Process an annotation
          -> DUALTree d u a l
          -> r
 foldDUAL _  _  EmptyDUAL       = mempty
@@ -217,25 +217,26 @@ foldDUAL lF aF (DUALTree _ t0) = go mempty t0
 
 -- | Similar to 'foldDUAL' but allows application of \partial\ down
 --   annotations. These allow application of parts of the down
---   annotation that can be applied higher up the tree, the original
---   down annotations are unaffected.
+--   annotation that can be applied higher up the tree. The partial
+--   annotations are reset at each @Concat@ branch, the original down
+--   annotations are unaffected.
 foldDUAL'
   :: (Action d a, Monoid' d, Monoid r)
-  => (d -> l -> r) -- ^ Process a leaf with total and local accumilation of down
-  -> (a -> r -> r) -- ^ Process an anotation
-  -> (d -> d -> p) -- ^ Given fully accumilated and partially
-                   --   accumilated down annotation, produce a partial
+  => (d -> l -> r) -- ^ Process a leaf with total and local accumulation of down
+  -> (a -> r -> r) -- ^ Process an annotation
+  -> (d -> d -> p) -- ^ Given fully accumulated and partially
+                   --   accumulated down annotation, produce a partial
                    --   down annotation @p@
-  -> (p -> r -> r) -- ^ Process a partial down anotation
+  -> (p -> r -> r) -- ^ Process a partial down annotation
   -> DUALTree d u a l
   -> r
 foldDUAL' _  _  _   _  EmptyDUAL       = mempty
 foldDUAL' lF aF mkP pF (DUALTree _ t0) = go mempty mempty t0
   where
-    -- d is the total accumilated down annotations becfore the last Concat
+    -- d is the total accumulated down annotations before the last Concat
     -- w is the down annotations since the last Concat
-    -- dw is the total accumilated down annotations
-    -- p is the partial annotation since the last concat
+    -- dw is the total accumulated down annotations
+    -- p is the partial annotation since the last Concat
     -- at every Concat, the partial annotation is applied and w is reset
     go !d w = \case
       Down d' t -> go d (w <> d') t
