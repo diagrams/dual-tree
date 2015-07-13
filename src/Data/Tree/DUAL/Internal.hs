@@ -184,14 +184,14 @@ mapU _ _              = EmptyDUAL
 -- | Apply a @u@ annotation of a DUALTree on the left. Makes a 'leafU'
 --   for an empty tree.
 preapplyU :: Semigroup u => u -> DUALTree d u a l -> DUALTree d u a l
-preapplyU u (DUALTree u' t) = DUALTree (u' <> u) t
-preapplyU u _               = leafU u
+preapplyU u' (DUALTree u t) = DUALTree (u' <> u) t
+preapplyU u' _              = leafU u'
 
 -- | Apply an @u@ annotation of a DUALTree on the right. Makes a 'leafU'
 --   for an empty tree.
 postapplyU :: Semigroup u => u -> DUALTree d u a l -> DUALTree d u a l
-postapplyU u (DUALTree u' t) = DUALTree (u <> u') t
-postapplyU u _               = leafU u
+postapplyU u' (DUALTree u t) = DUALTree (u <> u') t
+postapplyU u' _              = leafU u'
 
 ------------------------------------------------------------
 -- Folds
