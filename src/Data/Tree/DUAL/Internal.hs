@@ -70,7 +70,7 @@ import           Data.Typeable
 -- DALTree
 ------------------------------------------------------------------------
 
--- | /Non-empty/ DUAL-tree without the u.
+-- | DUAL-tree without a @u@ annotation.
 data DALTree d a l
   = Leaf   !l                  -- ^ @l@eaf
   | Down   !d !(DALTree d a l) -- ^ @d@own-annotation
