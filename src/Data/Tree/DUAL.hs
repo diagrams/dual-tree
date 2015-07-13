@@ -2,7 +2,7 @@
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Data.Tree.DUAL
--- Copyright   :  (c) 2011-2015 Brent Yorgey
+-- Copyright   :  (c) 2011-2015 dual-tree team (see LICENSE)
 -- License     :  BSD-style (see LICENSE)
 -- Maintainer  :  diagrams-discuss@googlegroups.com
 --
