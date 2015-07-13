@@ -43,4 +43,8 @@ library
     deepseq,
     containers
   hs-source-dirs:    src
+  other-extensions:
+    BangPatterns CPP DeriveDataTypeable DeriveFunctor DeriveTraversable
+    FlexibleContexts FlexibleInstances LambdaCase MultiParamTypeClasses
+    TypeOperators
 
