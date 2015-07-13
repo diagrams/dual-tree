@@ -33,8 +33,8 @@
 --     constant time.
 --
 --   * Internal nodes with data values of type @a@, possibly of a
---     different type than those in the leaves. These are just \"along
---     for the ride\" and are unaffected by @u@ and @d@ annotations.
+--     different type than those in the leaves. These annotations are
+--     acted on by any @d@ annotations above it.
 --
 --   The @u@ annotation represents information about a tree that should
 --   be accumulated (/e.g./ number of leaves, some sort of \"weight\",
