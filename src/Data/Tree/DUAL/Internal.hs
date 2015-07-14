@@ -24,9 +24,9 @@
 -- The main things exported by this module which are not exported from
 -- "Data.Tree.DUAL" is one extra type used in the implementation of
 -- 'DUALTree', along with functions for manipulating them. A type of
--- /non-empty/ trees without up annotations, 'DALTree', is defined. A
--- 'DUALTree' is a 'DALTree' with a top-level @u@ annotation along with
--- a possible 'EmptyDUAL'. This method has the advantage that the type
+-- trees without up annotations, 'DALTree', is defined. A 'DUALTree'
+-- is a 'DALTree' with a top-level @u@ annotation along with a
+-- possible 'EmptyDUAL'. This method has the advantage that the type
 -- system enforces the invariant that there is only one representation
 -- for the empty tree. It also allows us to get away with only
 -- 'Semigroup' constraints in many places.
@@ -177,6 +177,12 @@ getU (DUALTree u _) = Just u
 getU _              = Nothing
 
 -- | Map over the @u@ annotation of a DUALTree.
+--
+--   If you want 'mapU' to commute with monoid composition, that is,
+--   @mapU f (d1 \<\> d2) === mapU f d1 \<\> mapU f d2@, it suffices
+--   to ensure that @f@ is a monoid homomorphism, that is, @f mempty =
+--   mempty@ and @f (u1 \<\> u2) = f u1 \<\> f u2@.  Additionally,
+--   @mapU f@ will commute with @act d@ if @f@ does.
 mapU :: (u -> u') -> DUALTree d u a l -> DUALTree d u' a l
 mapU f (DUALTree u t) = DUALTree (f u) t
 mapU _ _              = EmptyDUAL
@@ -215,11 +221,14 @@ foldDUAL lF aF (DUALTree _ t0) = go mempty t0
       Concat ts -> F.foldMap (go d) ts
 {-# INLINE foldDUAL #-}
 
--- | Similar to 'foldDUAL' but allows application of \partial\ down
---   annotations. These allow application of parts of the down
---   annotation that can be applied higher up the tree. The partial
---   annotations are reset at each @Concat@ branch, the original down
---   annotations are unaffected.
+-- | Similar to 'foldDUAL', but with access to /partial/ down
+--   annotations at @Concat@ nodes and @Leaf@ nodes, as well as
+--   complete accumulated down annotations at leaves, as with
+--   'foldDUAL'.  At each @Concat@ node and each @Leaf@, the @(d -> d
+--   -> p)@ function is given access to the total accumulated down
+--   annotation from the root, as well as the partially accumulated
+--   value since the nearest parent @Concat@ node.  The resulting @p@
+--   value will be processed by the @(p -> r -> r)@ function.
 foldDUAL'
   :: (Action d a, Monoid' d, Monoid r)
   => (d -> l -> r) -- ^ Process a leaf with total and local accumulation of down
