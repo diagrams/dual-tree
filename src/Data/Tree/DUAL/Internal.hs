@@ -1,15 +1,18 @@
+{-# LANGUAGE CPP                        #-}
+{-# LANGUAGE BangPatterns               #-}
 {-# LANGUAGE DeriveDataTypeable         #-}
 {-# LANGUAGE DeriveFunctor              #-}
+{-# LANGUAGE DeriveTraversable          #-}
 {-# LANGUAGE FlexibleContexts           #-}
 {-# LANGUAGE FlexibleInstances          #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE LambdaCase                 #-}
 {-# LANGUAGE MultiParamTypeClasses      #-}
 {-# LANGUAGE TypeOperators              #-}
 
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Data.Tree.DUAL.Internal
--- Copyright   :  (c) 2011-2012 Brent Yorgey
+-- Copyright   :  (c) 2011-2015 dual-tree team (see LICENSE)
 -- License     :  BSD-style (see LICENSE)
 -- Maintainer  :  diagrams-discuss@googlegroups.com
 --
@@ -19,107 +22,77 @@
 -- "Data.Tree.DUAL".
 --
 -- The main things exported by this module which are not exported from
--- "Data.Tree.DUAL" are two extra types used in the implementation of
--- 'DUALTree', along with functions for manipulating them.  A type of
--- /non-empty/ trees, 'DUALTreeNE', is defined, as well as the type
--- 'DUALTreeU' which represents a non-empty tree paired with a cached
--- @u@ annotation.  'DUALTreeNE' and 'DUALTreeU' are mutually
--- recursive, so that recursive tree nodes are interleaved with cached
--- @u@ annotations.  'DUALTree' is defined by just wrapping
--- 'DUALTreeU' in 'Option'.  This method has the advantage that the
--- type system enforces the invariant that there is only one
--- representation for the empty tree.  It also allows us to get away
--- with only 'Semigroup' constraints in many places.
+-- "Data.Tree.DUAL" is one extra type used in the implementation of
+-- 'DUALTree', along with functions for manipulating them. A type of
+-- trees without up annotations, 'DALTree', is defined. A 'DUALTree'
+-- is a 'DALTree' with a top-level @u@ annotation along with a
+-- possible 'EmptyDUAL'. This method has the advantage that the type
+-- system enforces the invariant that there is only one representation
+-- for the empty tree. It also allows us to get away with only
+-- 'Semigroup' constraints in many places.
 --
 -----------------------------------------------------------------------------
 
 module Data.Tree.DUAL.Internal
-       (
-         -- * DUAL-trees
-         DUALTreeNE(..), DUALTreeU(..), DUALTree(..)
+  (
+    -- * DUAL-trees
+    DALTree(..), DUALTree(..)
 
-         -- * Constructing DUAL-trees
-       , empty, leaf, leafU, annot, applyD
+    -- * Constructing DUAL-trees
+  , leaf, leafU, down, annot
 
-         -- * Modifying DUAL-trees
-       , applyUpre, applyUpost
-       , mapUNE, mapUU, mapU
+    -- * Folding DUAL-trees
+  , foldDUAL
+  , foldDUAL'
+  , flatten
 
-         -- * Accessors and eliminators
-       , nonEmpty, getU, foldDUALNE, foldDUAL, flatten
+    -- * Up annotations
+  , _u
+  , getU
+  , mapU
+  , preapplyU
+  , postapplyU
 
-       ) where
+  ) where
 
-import           Control.Arrow      ((***))
-import           Data.List.NonEmpty (NonEmpty (..))
-import qualified Data.List.NonEmpty as NEL
-import           Data.Maybe         (fromMaybe)
+#if __GLASGOW_HASKELL__ < 710
+import           Control.Applicative
+#endif
+import           Control.DeepSeq
+import           Data.Foldable             as F (foldMap)
 import           Data.Monoid.Action
+import           Data.Monoid.WithSemigroup
 import           Data.Semigroup
+import           Data.Sequence
 import           Data.Typeable
 
-import           Control.Newtype
+------------------------------------------------------------------------
+-- DALTree
+------------------------------------------------------------------------
 
-------------------------------------------------------------
--- DUALTreeNE
-------------------------------------------------------------
-
--- | /Non-empty/ DUAL-trees.
-data DUALTreeNE d u a l
-  = Leaf   u l        -- ^ Leaf with data value and @u@ annotation
-  | LeafU  u          -- ^ Leaf with only @u@ annotation
-  | Concat (NonEmpty (DUALTreeU d u a l))
-                      -- ^ n-way branch, containing a /non-empty/ list
-                      --   of subtrees.
-  | Act    d (DUALTreeU d u a l)
-                      -- ^ @d@ annotation
-  | Annot  a (DUALTreeU d u a l)
-                      -- ^ Internal data value
+-- | DUAL-tree without a @u@ annotation.
+data DALTree d a l
+  = Leaf   !l                  -- ^ @l@eaf
+  | Down   !d !(DALTree d a l) -- ^ @d@own-annotation
+  | Annot  !a !(DALTree d a l) -- ^ @a@nnotation
+  | Concat (Seq (DALTree d a l)) -- ^ n-way branch
   deriving (Functor, Typeable, Show, Eq)
 
-instance (Action d u, Semigroup u) => Semigroup (DUALTreeNE d u a l) where
-  t1 <> t2   = sconcat (NEL.fromList [t1,t2])
-  sconcat    = Concat . NEL.map pullU
+instance Semigroup d => Semigroup (DALTree d a l) where
+  Concat t1 <> Concat t2  = Concat (t1 <> t2)
+  Concat t1 <> t2         = Concat (t1 |> t2)
+  t1        <> Concat t2  = Concat (t1 <| t2)
+  t1        <> t2         = Concat (fromList [t1,t2])
 
-newtype DAct d = DAct { unDAct :: d }
+instance (NFData d, NFData a, NFData l) => NFData (DALTree d a l) where
+  rnf (Leaf l)    = rnf l
+  rnf (Down d t)  = rnf d `seq` rnf t
+  rnf (Annot a t) = rnf a `seq` rnf t
+  rnf (Concat s)  = rnf s
 
-instance Newtype (DAct d) d where
-  pack   = DAct
-  unpack = unDAct
-
-instance (Semigroup d, Semigroup u, Action d u)
-    => Action (DAct d) (DUALTreeNE d u a l) where
-  act (DAct d) (Act d' t) = Act (d <> d') t
-  act (DAct d) t          = Act d (pullU t)
-
-------------------------------------------------------------
--- DUALTreeU
-------------------------------------------------------------
-
--- | A non-empty DUAL-tree paired with a cached @u@ value.  These
---   should never be constructed directly; instead, use 'pullU'.
-newtype DUALTreeU d u a l = DUALTreeU { unDUALTreeU :: (u, DUALTreeNE d u a l) }
-  deriving (Functor, Semigroup, Typeable, Show, Eq)
-
-instance Newtype (DUALTreeU d u a l) (u, DUALTreeNE d u a l) where
-  pack   = DUALTreeU
-  unpack = unDUALTreeU
-
-instance (Semigroup d, Semigroup u, Action d u)
-    => Action (DAct d) (DUALTreeU d u a l) where
-  act d = over DUALTreeU (act (unDAct d) *** act d)
-
--- | \"Pull\" the root @u@ annotation out into a tuple.
-pullU :: (Semigroup u, Action d u) => DUALTreeNE d u a l -> DUALTreeU d u a l
-pullU t@(Leaf u _)                   = pack (u, t)
-pullU t@(LeafU u)                    = pack (u, t)
-pullU t@(Concat ts)                  = pack (sconcat . NEL.map (fst . unpack) $ ts, t)
-pullU t@(Act d (DUALTreeU (u,_)))    = pack (act d u, t)
-pullU t@(Annot _ (DUALTreeU (u, _))) = pack (u, t)
-
-------------------------------------------------------------
+------------------------------------------------------------------------
 -- DUALTree
-------------------------------------------------------------
+------------------------------------------------------------------------
 
 -- | Rose (n-ary) trees with both upwards- (/i.e./ cached) and
 --   downwards-traveling (/i.e./ accumulating) monoidal annotations.
@@ -146,178 +119,146 @@ pullU t@(Annot _ (DUALTreeU (u, _))) = pack (u, t)
 --
 --   * 'Monoid'. The identity is the empty tree.
 
-newtype DUALTree d u a l = DUALTree { unDUALTree :: Option (DUALTreeU d u a l) }
-  deriving ( Functor, Semigroup, Typeable, Show, Eq )
+-- | A non-empty DUAL-tree paired with a cached @u@ value.  These
+--   should never be constructed directly; instead, use 'pullU'.
+data DUALTree d u a l
+  = DUALTree !u !(DALTree d a l)
+  | EmptyDUAL
+  deriving (Functor, Typeable, Show, Eq)
 
-instance Newtype (DUALTree d u a l) (Option (DUALTreeU d u a l)) where
-  pack   = DUALTree
-  unpack = unDUALTree
+instance (Semigroup u, Semigroup d) => Semigroup (DUALTree d u a l) where
+  DUALTree u1 t1 <> DUALTree u2 t2 = DUALTree (u1 <> u2) (t1 <> t2)
+  EmptyDUAL      <> a              = a
+  a              <> EmptyDUAL      = a
 
-instance (Semigroup u, Action d u) => Monoid (DUALTree d u a l) where
-  mempty  = DUALTree mempty
+instance (Semigroup u, Semigroup d) => Monoid (DUALTree d u a l) where
   mappend = (<>)
-  mconcat []     = mempty
-  mconcat (x:xs) = sconcat (x :| xs)
+  mempty  = EmptyDUAL
 
--- | Apply a @d@ annotation at the root of a tree.  Semantically, all
---   @u@ annotations are transformed by the action of @d@, although
---   operationally @act@ incurs only a constant amount of work.
-instance (Semigroup d, Semigroup u, Action d u)
-    => Action (DAct d) (DUALTree d u a l) where
-  act = over DUALTree . fmap . act
+instance (NFData d, NFData u, NFData a, NFData l) => NFData (DUALTree d u a l) where
+  rnf (DUALTree u t) = rnf u `seq` rnf t
+  rnf _              = ()
 
 ------------------------------------------------------------
 -- Convenience methods etc.
 ------------------------------------------------------------
 
--- | The empty DUAL-tree.  This is a synonym for 'mempty', but with a
---   more general type.
-empty :: DUALTree d u a l
-empty = DUALTree (Option Nothing)
+-- | Traversal over the up annotation.
+_u :: Applicative f => (u -> f u') -> DUALTree d u a l -> f (DUALTree d u' a l)
+_u f (DUALTree u t) = fmap (\u' -> DUALTree u' t) (f u)
+_u _ _              = pure EmptyDUAL
 
--- | Construct a leaf node from a @u@ annotation along with a leaf
---   datum.
+-- | Construct a leaf node from a @u@ annotation along with a leaf.
 leaf :: u -> l -> DUALTree d u a l
-leaf u l = DUALTree (Option (Just (DUALTreeU (u, Leaf u l))))
+leaf u l = DUALTree u (Leaf l)
 
--- | Construct a leaf node from a @u@ annotation.
+-- | Construct an DUALTree that only contains a @u@ annotation.
 leafU :: u -> DUALTree d u a l
-leafU u = DUALTree (Option (Just (DUALTreeU (u, LeafU u))))
-
--- | Add a @u@ annotation to the root, combining it (on the left) with
---   the existing cached @u@ annotation.  This function is provided
---   just for convenience; @applyUpre u t = 'leafU' u \<\> t@.
-applyUpre :: (Semigroup u, Action d u) => u -> DUALTree d u a l -> DUALTree d u a l
-applyUpre u t = leafU u <> t
-
--- | Add a @u@ annotation to the root, combining it (on the right) with
---   the existing cached @u@ annotation.  This function is provided
---   just for convenience; @applyUpost u t = t \<\> 'leafU' u@.
-applyUpost :: (Semigroup u, Action d u) => u -> DUALTree d u a l -> DUALTree d u a l
-applyUpost u t = t <> leafU u
+leafU u = DUALTree u (Concat mempty)
 
 -- | Add an internal data value at the root of a tree.  Note that this
 --   only works on /non-empty/ trees; on empty trees this function is
---   the identity.
-annot :: (Semigroup u, Action d u) => a -> DUALTree d u a l -> DUALTree d u a l
-annot a = (over DUALTree . fmap) (pullU . Annot a)
+--   the identity. O(1)
+annot :: a -> DUALTree d u a l -> DUALTree d u a l
+annot _ EmptyDUAL      = EmptyDUAL
+annot a (DUALTree u t) = DUALTree u (Annot a t)
 
 -- | Apply a @d@ annotation at the root of a tree, transforming all
 --   @u@ annotations by the action of @d@.
-applyD :: (Semigroup d, Semigroup u, Action d u)
-       => d -> DUALTree d u a l -> DUALTree d u a l
-applyD = act . DAct
+down :: (Semigroup d, Semigroup u, Action d u) => d -> DUALTree d u a l -> DUALTree d u a l
+down _ EmptyDUAL      = EmptyDUAL
+down d (DUALTree u t) = DUALTree (act d u) $ case t of
+  Down d' t' -> Down (d <> d') t'
+  _          -> Down d t
 
--- | Decompose a DUAL-tree into either @Nothing@ (if empty) or a
---   top-level cached @u@ annotation paired with a non-empty
---   DUAL-tree.
-nonEmpty :: DUALTree d u a l -> Maybe (u, DUALTreeNE d u a l)
-nonEmpty = fmap unpack . getOption . unpack
-
--- | Get the @u@ annotation at the root, or @Nothing@ if the tree is
---   empty.
+-- | Get the up annotation of a non-empty DUALTree.
 getU :: DUALTree d u a l -> Maybe u
-getU = fmap fst . nonEmpty
+getU (DUALTree u _) = Just u
+getU _              = Nothing
 
-------------------------------------------------------------
--- Maps
-------------------------------------------------------------
-
--- XXX todo: try adding Map as a constructor, so we can delay the
--- mapping until the end too?
-
--- | Map a function (which must be a monoid homomorphism, and commute
---   with the action of @d@) over all the @u@ annotations in a non-empty
---   DUAL-tree.
-mapUNE :: (u -> u') -> DUALTreeNE d u a l -> DUALTreeNE d u' a l
-mapUNE f (Leaf u l)  = Leaf (f u) l
-mapUNE f (LeafU u)   = LeafU (f u)
-mapUNE f (Concat ts) = Concat ((NEL.map . mapUU) f ts)
-mapUNE f (Act d t)   = Act d (mapUU f t)
-mapUNE f (Annot a t) = Annot a (mapUU f t)
-
--- | Map a function (which must be a monoid homomorphism, and commute
---   with the action of @d@) over all the @u@ annotations in a
---   non-empty DUAL-tree paired with its cached @u@ value.
-mapUU :: (u -> u') -> DUALTreeU d u a l -> DUALTreeU d u' a l
-mapUU f = over DUALTreeU (f *** mapUNE f)
-
--- | Map a function over all the @u@ annotations in a DUAL-tree.  The
---   function must be a monoid homomorphism, and must commute with the
---   action of @d@ on @u@.  That is, to use @mapU f@ safely it must be
---   the case that
+-- | Map over the @u@ annotation of a DUALTree.
 --
---     * @f mempty == mempty@
---
---     * @f (u1 \<\> u2) == f u1 \<\> f u2@
---
---     * @f (act d u) == act d (f u)@
---
+--   If you want 'mapU' to commute with monoid composition, that is,
+--   @mapU f (d1 \<\> d2) === mapU f d1 \<\> mapU f d2@, it suffices
+--   to ensure that @f@ is a monoid homomorphism, that is, @f mempty =
+--   mempty@ and @f (u1 \<\> u2) = f u1 \<\> f u2@.  Additionally,
+--   @mapU f@ will commute with @act d@ if @f@ does.
 mapU :: (u -> u') -> DUALTree d u a l -> DUALTree d u' a l
-mapU = over DUALTree . fmap . mapUU
+mapU f (DUALTree u t) = DUALTree (f u) t
+mapU _ _              = EmptyDUAL
+
+-- | Apply a @u@ annotation of a DUALTree on the left. Makes a 'leafU'
+--   for an empty tree.
+preapplyU :: Semigroup u => u -> DUALTree d u a l -> DUALTree d u a l
+preapplyU u' (DUALTree u t) = DUALTree (u' <> u) t
+preapplyU u' _              = leafU u'
+
+-- | Apply an @u@ annotation of a DUALTree on the right. Makes a 'leafU'
+--   for an empty tree.
+postapplyU :: Semigroup u => u -> DUALTree d u a l -> DUALTree d u a l
+postapplyU u' (DUALTree u t) = DUALTree (u <> u') t
+postapplyU u' _              = leafU u'
 
 ------------------------------------------------------------
 -- Folds
 ------------------------------------------------------------
 
--- | Fold for non-empty DUAL-trees.
-foldDUALNE :: (Semigroup d, Monoid d)
-           => (d -> l -> r) -- ^ Process a leaf datum along with the
-                            --   accumulation of @d@ values along the
-                            --   path from the root
-           -> r             -- ^ Replace @LeafU@ nodes
-           -> (NonEmpty r -> r)  -- ^ Combine results at a branch node
-           -> (d -> r -> r)      -- ^ Process an internal d node
-           -> (a -> r -> r)      -- ^ Process an internal datum
-           -> DUALTreeNE d u a l -> r
-foldDUALNE  = foldDUALNE' (Option Nothing)
+-- | Fold a dual tree for a monoidal result @r@. The @d@ annotations are
+--   accumulated from the top of the tree. Static @a@ annotations are
+--   acted on by the @d@ annotation accumulated up to that point.
+foldDUAL :: (Action d a, Monoid' d, Monoid r)
+         => (d -> l -> r) -- ^ Process a leaf
+         -> (a -> r -> r) -- ^ Process an annotation
+         -> DUALTree d u a l
+         -> r
+foldDUAL _  _  EmptyDUAL       = mempty
+foldDUAL lF aF (DUALTree _ t0) = go mempty t0
   where
-    foldDUALNE' dacc lf _   _   _    _   (Leaf _ l)  = lf (option mempty id dacc) l
-    foldDUALNE' _    _  lfU _   _    _   (LeafU _)   = lfU
-    foldDUALNE' dacc lf lfU con down ann (Concat ts)
-      = con (NEL.map (foldDUALNE' dacc lf lfU con down ann . snd . unpack) ts)
-    foldDUALNE' dacc lf lfU con down ann (Act d t)
-      = down d (foldDUALNE' (dacc <> (Option (Just d))) lf lfU con down ann . snd . unpack $ t)
-    foldDUALNE' dacc lf lfU con down ann (Annot a t)
-      = ann a (foldDUALNE' dacc lf lfU con down ann . snd . unpack $ t)
+    go !d = \case
+      Down d' t -> go (d <> d') t
+      Leaf l    -> lF d l
+      Annot a t -> aF (act d a) (go d t)
+      Concat ts -> F.foldMap (go d) ts
+{-# INLINE foldDUAL #-}
 
--- | Fold for DUAL-trees. It is given access to the internal and leaf
---   data, internal @d@ values, and the accumulated @d@ values at each
---   leaf.  It is also allowed to replace \"@u@-only\" leaves with a
---   constant value.  In particular, however, it is /not/ given access
---   to any of the @u@ annotations, the idea being that those are used
---   only for /constructing/ trees.  If you do need access to @u@
---   values, you can duplicate the values you need in the internal
---   data nodes.
---
---   Be careful not to mix up the @d@ values at internal nodes with
---   the @d@ values at leaves.  Each @d@ value at a leaf satisfies the
---   property that it is the 'mconcat' of all internal @d@ values
---   along the path from the root to the leaf.
---
---   The result is @Nothing@ if and only if the tree is empty.
-foldDUAL :: (Semigroup d, Monoid d)
-         => (d -> l -> r)          -- ^ Process a leaf datum along with the
-                                   --   accumulation of @d@ values along the
-                                   --   path from the root
-         -> r                      -- ^ Replace @u@-only nodes
-         -> (NonEmpty r -> r)      -- ^ Combine results at a branch node
-         -> (d -> r -> r)          -- ^ Process an internal d node
-         -> (a -> r -> r)          -- ^ Process an internal datum
-         -> DUALTree d u a l -> Maybe r
-foldDUAL _ _ _ _ _ (DUALTree (Option Nothing))
-  = Nothing
-foldDUAL l u c d a (DUALTree (Option (Just (DUALTreeU (_, t)))))
-  = Just $ foldDUALNE l u c d a t
+-- | Similar to 'foldDUAL', but with access to /partial/ down
+--   annotations at @Concat@ nodes and @Leaf@ nodes, as well as
+--   complete accumulated down annotations at leaves, as with
+--   'foldDUAL'.  At each @Concat@ node and each @Leaf@, the @(d -> d
+--   -> p)@ function is given access to the total accumulated down
+--   annotation from the root, as well as the partially accumulated
+--   value since the nearest parent @Concat@ node.  The resulting @p@
+--   value will be processed by the @(p -> r -> r)@ function.
+foldDUAL'
+  :: (Action d a, Monoid' d, Monoid r)
+  => (d -> l -> r) -- ^ Process a leaf with total and local accumulation of down
+  -> (a -> r -> r) -- ^ Process an annotation
+  -> (d -> d -> p) -- ^ Given fully accumulated and partially
+                   --   accumulated down annotation, produce a partial
+                   --   down annotation @p@
+  -> (p -> r -> r) -- ^ Process a partial down annotation
+  -> DUALTree d u a l
+  -> r
+foldDUAL' _  _  _   _  EmptyDUAL       = mempty
+foldDUAL' lF aF mkP pF (DUALTree _ t0) = go mempty mempty t0
+  where
+    -- d is the total accumulated down annotations before the last Concat
+    -- w is the down annotations since the last Concat
+    -- dw is the total accumulated down annotations
+    -- p is the partial annotation since the last Concat
+    -- at every Concat, the partial annotation is applied and w is reset
+    go !d w = \case
+      Down d' t -> go d (w <> d') t
+      Leaf l    -> pF p $ lF dw l
+      Annot a t -> aF (act dw a) (go d w t)
+      Concat ts -> pF p $ F.foldMap (go dw mempty) ts
+      where p  = mkP d w
+            dw = d <> w
+{-# INLINE foldDUAL' #-}
 
 -- | A specialized fold provided for convenience: flatten a tree into
 --   a list of leaves along with their @d@ annotations, ignoring
 --   internal data values.
-flatten :: (Semigroup d, Monoid d) => DUALTree d u a l -> [(l, d)]
-flatten = fromMaybe []
-        . foldDUAL
-            (\d l -> [(l, d)])
-            []
-            (concat . NEL.toList)
-            (flip const)
-            (const id)
+flatten :: (Action d a, Monoid' d) => DUALTree d u a l -> [(l, d)]
+flatten = foldDUAL (\d l -> [(l, d)]) (flip const)
+
