@@ -24,8 +24,8 @@
 -- The main things exported by this module which are not exported from
 -- "Data.Tree.DUAL" is one extra type used in the implementation of
 -- 'DUALTree', along with functions for manipulating them. A type of
--- trees without up annotations, 'DALTree', is defined. A 'DUALTree'
--- is a 'DALTree' with a top-level @u@ annotation along with a
+-- trees without up annotations, 'NE', is defined. A 'DUALTree'
+-- is a 'NE' with a top-level @u@ annotation along with a
 -- possible 'EmptyDUAL'. This method has the advantage that the type
 -- system enforces the invariant that there is only one representation
 -- for the empty tree. It also allows us to get away with only
@@ -36,10 +36,10 @@
 module Data.Tree.DUAL.Internal
   (
     -- * DUAL-trees
-    DALTree(..), DUALTree(..)
+    NE(..), DUALTree(..)
 
     -- * Constructing DUAL-trees
-  , leaf, leafU, down, annot
+  , _u, leaf, leafU, down, annot
 
     -- * Folding DUAL-trees
   , foldDUAL
@@ -47,7 +47,7 @@ module Data.Tree.DUAL.Internal
   , flatten
 
     -- * Up annotations
-  , _u
+  -- , _u
   , getU
   , mapU
   , preapplyU
@@ -67,28 +67,44 @@ import           Data.Sequence
 import           Data.Typeable
 
 ------------------------------------------------------------------------
--- DALTree
+-- Non-Empty tree
 ------------------------------------------------------------------------
 
--- | DUAL-tree without a @u@ annotation.
-data DALTree d a l
-  = Leaf   !l                  -- ^ @l@eaf
-  | Down   !d !(DALTree d a l) -- ^ @d@own-annotation
-  | Annot  !a !(DALTree d a l) -- ^ @a@nnotation
-  | Concat (Seq (DALTree d a l)) -- ^ n-way branch
+-- | Non-Empty DUAL-tree. u annotations are included so parts of the
+--   tree can be edited and the u annotations can be rebuilt properly.
+data NE d u a l
+  = Leaf   u !l                  -- ^ @l@eaf
+  | Down   u !d !(NE d u a l)    -- ^ @d@own-annotation
+  | Annot  u !a !(NE d u a l)    -- ^ @a@nnotation
+  | Concat u !(Seq (NE d u a l)) -- ^ n-way branch
   deriving (Functor, Typeable, Show, Eq)
 
-instance Semigroup d => Semigroup (DALTree d a l) where
-  Concat t1 <> Concat t2  = Concat (t1 <> t2)
-  Concat t1 <> t2         = Concat (t1 |> t2)
-  t1        <> Concat t2  = Concat (t1 <| t2)
-  t1        <> t2         = Concat (fromList [t1,t2])
+gu :: NE d u a l -> u
+gu = \case
+  Leaf   u _   -> u
+  Down   u _ _ -> u
+  Annot  u _ _ -> u
+  Concat u _   -> u
 
-instance (NFData d, NFData a, NFData l) => NFData (DALTree d a l) where
-  rnf (Leaf l)    = rnf l
-  rnf (Down d t)  = rnf d `seq` rnf t
-  rnf (Annot a t) = rnf a `seq` rnf t
-  rnf (Concat s)  = rnf s
+fu :: (u -> u') -> NE d u a l -> NE d u' a l
+fu f = go where
+  go = \case
+    Leaf u l    -> Leaf (f u) l
+    Down u d t  -> Down (f u) d (go t)
+    Annot u a t -> Annot (f u) a (go t)
+    Concat u ts -> Concat (f u) (fmap go ts)
+
+instance (Semigroup d, Semigroup u) => Semigroup (NE d u a l) where
+  Concat u1 t1 <> Concat u2 t2  = Concat (u1 <> u2)    (t1 <> t2)
+  Concat u1 t1 <> t2            = Concat (u1 <> gu t2) (t1 |> t2)
+  t1           <> Concat u2 t2  = Concat (gu t1 <> u2) (t1 <| t2)
+  t1           <> t2            = Concat (gu t1 <> gu t2) (fromList [t1,t2])
+
+instance (NFData d, NFData u, NFData a, NFData l) => NFData (NE d u a l) where
+  rnf (Leaf u l)    = rnf u `seq` rnf l
+  rnf (Down u d t)  = rnf u `seq` rnf d `seq` rnf t
+  rnf (Annot u a t) = rnf u `seq` rnf a `seq` rnf t
+  rnf (Concat u s)  = rnf u `seq` rnf s
 
 ------------------------------------------------------------------------
 -- DUALTree
@@ -122,14 +138,14 @@ instance (NFData d, NFData a, NFData l) => NFData (DALTree d a l) where
 -- | A non-empty DUAL-tree paired with a cached @u@ value.  These
 --   should never be constructed directly; instead, use 'pullU'.
 data DUALTree d u a l
-  = DUALTree !u !(DALTree d a l)
+  = DUALTree !(NE d u a l)
   | EmptyDUAL
   deriving (Functor, Typeable, Show, Eq)
 
 instance (Semigroup u, Semigroup d) => Semigroup (DUALTree d u a l) where
-  DUALTree u1 t1 <> DUALTree u2 t2 = DUALTree (u1 <> u2) (t1 <> t2)
-  EmptyDUAL      <> a              = a
-  a              <> EmptyDUAL      = a
+  DUALTree  t1 <> DUALTree t2 = DUALTree (t1 <> t2)
+  EmptyDUAL    <> a           = a
+  a            <> EmptyDUAL   = a
 
 instance (Semigroup u, Semigroup d) => Monoid (DUALTree d u a l) where
   mappend = (<>)
@@ -143,38 +159,44 @@ instance (NFData d, NFData u, NFData a, NFData l) => NFData (DUALTree d u a l) w
 -- Convenience methods etc.
 ------------------------------------------------------------
 
--- | Traversal over the up annotation.
+-- | Traversal over all up annotations.
 _u :: Applicative f => (u -> f u') -> DUALTree d u a l -> f (DUALTree d u' a l)
-_u f (DUALTree u t) = fmap (\u' -> DUALTree u' t) (f u)
-_u _ _              = pure EmptyDUAL
+_u f (DUALTree t0) = DUALTree <$> go t0 where
+  go = \case
+    Leaf u l    -> Leaf <$> f u <*> pure l
+    Down u d t  -> Down <$> f u <*> pure d <*> go t
+    Annot u a t -> Annot <$> f u <*> pure a <*> go t
+    Concat u ts -> Concat <$> f u <*> traverse go ts
+_u _ _            = pure EmptyDUAL
 
 -- | Construct a leaf node from a @u@ annotation along with a leaf.
 leaf :: u -> l -> DUALTree d u a l
-leaf u l = DUALTree u (Leaf l)
+leaf u l = DUALTree (Leaf u l)
 
 -- | Construct an DUALTree that only contains a @u@ annotation.
 leafU :: u -> DUALTree d u a l
-leafU u = DUALTree u (Concat mempty)
+leafU u = DUALTree (Concat u mempty)
 
 -- | Add an internal data value at the root of a tree.  Note that this
 --   only works on /non-empty/ trees; on empty trees this function is
 --   the identity. O(1)
 annot :: a -> DUALTree d u a l -> DUALTree d u a l
-annot _ EmptyDUAL      = EmptyDUAL
-annot a (DUALTree u t) = DUALTree u (Annot a t)
+annot _ EmptyDUAL    = EmptyDUAL
+annot a (DUALTree t) = DUALTree (Annot (gu t) a t)
 
 -- | Apply a @d@ annotation at the root of a tree, transforming all
 --   @u@ annotations by the action of @d@.
 down :: (Semigroup d, Semigroup u, Action d u) => d -> DUALTree d u a l -> DUALTree d u a l
 down _ EmptyDUAL      = EmptyDUAL
-down d (DUALTree u t) = DUALTree (act d u) $ case t of
-  Down d' t' -> Down (d <> d') t'
-  _          -> Down d t
+down d (DUALTree t) = DUALTree $ case t of
+  Down _ d' t' -> Down u (d <> d') t'
+  _            -> Down u d t
+  where u = act d (gu t)
 
 -- | Get the up annotation of a non-empty DUALTree.
 getU :: DUALTree d u a l -> Maybe u
-getU (DUALTree u _) = Just u
-getU _              = Nothing
+getU (DUALTree t) = Just (gu t)
+getU _            = Nothing
 
 -- | Map over the @u@ annotation of a DUALTree.
 --
@@ -184,19 +206,29 @@ getU _              = Nothing
 --   mempty@ and @f (u1 \<\> u2) = f u1 \<\> f u2@.  Additionally,
 --   @mapU f@ will commute with @act d@ if @f@ does.
 mapU :: (u -> u') -> DUALTree d u a l -> DUALTree d u' a l
-mapU f (DUALTree u t) = DUALTree (f u) t
-mapU _ _              = EmptyDUAL
+mapU f (DUALTree t) = DUALTree (fu f t)
+mapU _ _            = EmptyDUAL
 
 -- | Apply a @u@ annotation of a DUALTree on the left. Makes a 'leafU'
 --   for an empty tree.
 preapplyU :: Semigroup u => u -> DUALTree d u a l -> DUALTree d u a l
-preapplyU u' (DUALTree u t) = DUALTree (u' <> u) t
-preapplyU u' _              = leafU u'
+preapplyU u' (DUALTree t0) = DUALTree $
+  case t0 of
+    Leaf u l    -> Leaf (u' <> u) l
+    Down u d t  -> Down (u' <> u) d t
+    Annot u a t -> Annot (u' <> u) a t
+    Concat u ts -> Concat (u' <> u) ts
+preapplyU u' _            = leafU u'
 
 -- | Apply an @u@ annotation of a DUALTree on the right. Makes a 'leafU'
 --   for an empty tree.
 postapplyU :: Semigroup u => u -> DUALTree d u a l -> DUALTree d u a l
-postapplyU u' (DUALTree u t) = DUALTree (u <> u') t
+postapplyU u' (DUALTree t0) = DUALTree $
+  case t0 of
+    Leaf u l    -> Leaf (u <> u') l
+    Down u d t  -> Down (u <> u') d t
+    Annot u a t -> Annot (u <> u') a t
+    Concat u ts -> Concat (u <> u') ts
 postapplyU u' _              = leafU u'
 
 ------------------------------------------------------------
@@ -212,13 +244,13 @@ foldDUAL :: (Action d a, Monoid' d, Monoid r)
          -> DUALTree d u a l
          -> r
 foldDUAL _  _  EmptyDUAL       = mempty
-foldDUAL lF aF (DUALTree _ t0) = go mempty t0
+foldDUAL lF aF (DUALTree t0) = go mempty t0
   where
     go !d = \case
-      Down d' t -> go (d <> d') t
-      Leaf l    -> lF d l
-      Annot a t -> aF (act d a) (go d t)
-      Concat ts -> F.foldMap (go d) ts
+      Down _ d' t -> go (d <> d') t
+      Leaf _ l    -> lF d l
+      Annot _ a t -> aF (act d a) (go d t)
+      Concat _ ts -> F.foldMap (go d) ts
 {-# INLINE foldDUAL #-}
 
 -- | Similar to 'foldDUAL', but with access to /partial/ down
@@ -239,8 +271,8 @@ foldDUAL'
   -> (p -> r -> r) -- ^ Process a partial down annotation
   -> DUALTree d u a l
   -> r
-foldDUAL' _  _  _   _  EmptyDUAL       = mempty
-foldDUAL' lF aF mkP pF (DUALTree _ t0) = go mempty mempty t0
+foldDUAL' _  _  _   _  EmptyDUAL     = mempty
+foldDUAL' lF aF mkP pF (DUALTree t0) = go mempty mempty t0
   where
     -- d is the total accumulated down annotations before the last Concat
     -- w is the down annotations since the last Concat
@@ -248,10 +280,10 @@ foldDUAL' lF aF mkP pF (DUALTree _ t0) = go mempty mempty t0
     -- p is the partial annotation since the last Concat
     -- at every Concat, the partial annotation is applied and w is reset
     go !d w = \case
-      Down d' t -> go d (w <> d') t
-      Leaf l    -> pF p $ lF dw l
-      Annot a t -> aF (act dw a) (go d w t)
-      Concat ts -> pF p $ F.foldMap (go dw mempty) ts
+      Down _ d' t -> go d (w <> d') t
+      Leaf _ l    -> pF p $ lF dw l
+      Annot _ a t -> aF (act dw a) (go d w t)
+      Concat _ ts -> pF p $ F.foldMap (go dw mempty) ts
       where p  = mkP d w
             dw = d <> w
 {-# INLINE foldDUAL' #-}

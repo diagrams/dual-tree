@@ -47,4 +47,5 @@ library
     BangPatterns CPP DeriveDataTypeable DeriveFunctor DeriveTraversable
     FlexibleContexts FlexibleInstances LambdaCase MultiParamTypeClasses
     TypeOperators
+  ghc-options:      -Wall
 
