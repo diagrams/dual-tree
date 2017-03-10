@@ -5,6 +5,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses      #-}
 {-# LANGUAGE TypeOperators              #-}
+{-# LANGUAGE TypeFamilies               #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -83,7 +84,8 @@ instance (Action d u, Semigroup u) => Semigroup (DUALTreeNE d u a l) where
 
 newtype DAct d = DAct { unDAct :: d }
 
-instance Newtype (DAct d) d where
+instance Newtype (DAct d) where
+  type O (DAct d) = d
   pack   = DAct
   unpack = unDAct
 
@@ -101,7 +103,8 @@ instance (Semigroup d, Semigroup u, Action d u)
 newtype DUALTreeU d u a l = DUALTreeU { unDUALTreeU :: (u, DUALTreeNE d u a l) }
   deriving (Functor, Semigroup, Typeable, Show, Eq)
 
-instance Newtype (DUALTreeU d u a l) (u, DUALTreeNE d u a l) where
+instance Newtype (DUALTreeU d u a l) where
+  type O (DUALTreeU d u a l) = (u, DUALTreeNE d u a l)
   pack   = DUALTreeU
   unpack = unDUALTreeU
 
@@ -149,7 +152,8 @@ pullU t@(Annot _ (DUALTreeU (u, _))) = pack (u, t)
 newtype DUALTree d u a l = DUALTree { unDUALTree :: Option (DUALTreeU d u a l) }
   deriving ( Functor, Semigroup, Typeable, Show, Eq )
 
-instance Newtype (DUALTree d u a l) (Option (DUALTreeU d u a l)) where
+instance Newtype (DUALTree d u a l) where
+  type O (DUALTree d u a l) = Option (DUALTreeU d u a l)
   pack   = DUALTree
   unpack = unDUALTree
 
