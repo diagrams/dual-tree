@@ -52,3 +52,14 @@ library
                      TypeOperators,
                      FlexibleContexts,
                      DeriveDataTypeable
+test-suite test
+  default-language:  Haskell2010
+  type:              exitcode-stdio-1.0
+  main-is:           Test.hs
+  hs-source-dirs:    test
+  ghc-options:       -Wall
+  build-depends:     base,
+                     QuickCheck,
+                     testing-feat,
+                     monoid-extras,
+                     dual-tree
