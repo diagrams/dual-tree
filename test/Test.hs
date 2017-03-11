@@ -8,7 +8,7 @@ import           Data.Functor
 import           Data.Maybe
 import           Data.Typeable
 
-import           Test.QuickCheck
+import           Test.QuickCheck hiding ((===))
 import           Test.Feat
 
 import           Data.List.NonEmpty (NonEmpty)
@@ -43,12 +43,6 @@ buildTree (EAnnot a t) = annot a (buildTree t)
 
 instance Num a => Action (Product a) (Sum a) where
   act (Product p) (Sum s) = Sum (p * s)
-
-instance Arbitrary (Sum Int) where
-  arbitrary = Sum <$> arbitrary
-
-instance Arbitrary (Product Int) where
-  arbitrary = Product <$> arbitrary
 
 type U = Sum Int
 type D = Product Int
@@ -108,3 +102,6 @@ prop_act_mempty d = applyD d (mempty :: T) == mempty
 
 prop_act_mappend :: D -> T -> T -> Bool
 prop_act_mappend d t1 t2 = applyD d (t1 <> t2) === applyD d t1 <> applyD d t2
+
+return []
+main = $quickCheckAll
