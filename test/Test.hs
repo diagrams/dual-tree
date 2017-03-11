@@ -12,6 +12,7 @@ import           Data.Functor
 import           Data.Maybe
 import           Data.Typeable
 
+import           Test.QuickCheck.All (quickCheckAll)
 import           Test.QuickCheck hiding ((===))
 import           Test.Feat
 
