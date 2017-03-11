@@ -57,9 +57,9 @@ test-suite test
   type:              exitcode-stdio-1.0
   main-is:           Test.hs
   hs-source-dirs:    test
-  ghc-options:       -Wall
   build-depends:     base,
                      QuickCheck,
                      testing-feat,
                      monoid-extras,
+                     semigroups,
                      dual-tree
