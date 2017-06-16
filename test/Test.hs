@@ -52,8 +52,8 @@ instance Num a => Action (Product a) (Sum a) where
 type U = Sum Int
 type D = Product Int
 
-deriving instance Typeable1 Sum
-deriving instance Typeable1 Product
+deriving instance Typeable Sum
+deriving instance Typeable Product
 
 deriveEnumerable ''Sum
 deriveEnumerable ''Product
