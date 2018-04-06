@@ -40,7 +40,7 @@ library
   default-language:  Haskell2010
   exposed-modules:   Data.Tree.DUAL
                      Data.Tree.DUAL.Internal
-  build-depends:     base >= 4.3 && < 4.11,
+  build-depends:     base >= 4.3 && < 4.12,
                      semigroups >= 0.8 && < 0.19,
                      newtype-generics >= 0.5 && < 0.6,
                      monoid-extras >= 0.2 && < 0.5
