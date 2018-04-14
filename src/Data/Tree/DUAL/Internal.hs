@@ -59,7 +59,7 @@ import           Data.Monoid.Action
 import           Data.Semigroup
 import           Data.Typeable
 
-import           Control.Newtype
+import           Control.Newtype.Generics
 
 ------------------------------------------------------------
 -- DUALTreeNE
