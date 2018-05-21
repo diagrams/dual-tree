@@ -42,7 +42,7 @@ library
                      Data.Tree.DUAL.Internal
   build-depends:     base >= 4.3 && < 4.12,
                      semigroups >= 0.8 && < 0.19,
-                     newtype-generics >= 0.5 && < 0.6,
+                     newtype-generics >= 0.5.3 && < 0.6,
                      monoid-extras >= 0.2 && < 0.6
   hs-source-dirs:    src
   other-extensions:  GeneralizedNewtypeDeriving,
