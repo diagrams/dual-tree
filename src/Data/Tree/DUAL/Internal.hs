@@ -27,7 +27,7 @@
 -- @u@ annotation.  'DUALTreeNE' and 'DUALTreeU' are mutually
 -- recursive, so that recursive tree nodes are interleaved with cached
 -- @u@ annotations.  'DUALTree' is defined by just wrapping
--- 'DUALTreeU' in 'Option'.  This method has the advantage that the
+-- 'DUALTreeU' in 'Maybe.  This method has the advantage that the
 -- type system enforces the invariant that there is only one
 -- representation for the empty tree.  It also allows us to get away
 -- with only 'Semigroup' constraints in many places.
@@ -149,11 +149,11 @@ pullU t@(Annot _ (DUALTreeU (u, _))) = pack (u, t)
 --
 --   * 'Monoid'. The identity is the empty tree.
 
-newtype DUALTree d u a l = DUALTree { unDUALTree :: Option (DUALTreeU d u a l) }
+newtype DUALTree d u a l = DUALTree { unDUALTree :: Maybe (DUALTreeU d u a l) }
   deriving ( Functor, Semigroup, Typeable, Show, Eq )
 
 instance Newtype (DUALTree d u a l) where
-  type O (DUALTree d u a l) = Option (DUALTreeU d u a l)
+  type O (DUALTree d u a l) = Maybe (DUALTreeU d u a l)
   pack   = DUALTree
   unpack = unDUALTree
 
@@ -177,16 +177,16 @@ instance (Semigroup d, Semigroup u, Action d u)
 -- | The empty DUAL-tree.  This is a synonym for 'mempty', but with a
 --   more general type.
 empty :: DUALTree d u a l
-empty = DUALTree (Option Nothing)
+empty = DUALTree Nothing
 
 -- | Construct a leaf node from a @u@ annotation along with a leaf
 --   datum.
 leaf :: u -> l -> DUALTree d u a l
-leaf u l = DUALTree (Option (Just (DUALTreeU (u, Leaf u l))))
+leaf u l = DUALTree (Just (DUALTreeU (u, Leaf u l)))
 
 -- | Construct a leaf node from a @u@ annotation.
 leafU :: u -> DUALTree d u a l
-leafU u = DUALTree (Option (Just (DUALTreeU (u, LeafU u))))
+leafU u = DUALTree (Just (DUALTreeU (u, LeafU u)))
 
 -- | Add a @u@ annotation to the root, combining it (on the left) with
 --   the existing cached @u@ annotation.  This function is provided
@@ -216,7 +216,7 @@ applyD = act . DAct
 --   top-level cached @u@ annotation paired with a non-empty
 --   DUAL-tree.
 nonEmpty :: DUALTree d u a l -> Maybe (u, DUALTreeNE d u a l)
-nonEmpty = fmap unpack . getOption . unpack
+nonEmpty = fmap unpack . unpack
 
 -- | Get the @u@ annotation at the root, or @Nothing@ if the tree is
 --   empty.
@@ -274,14 +274,14 @@ foldDUALNE :: (Semigroup d, Monoid d)
            -> (d -> r -> r)      -- ^ Process an internal d node
            -> (a -> r -> r)      -- ^ Process an internal datum
            -> DUALTreeNE d u a l -> r
-foldDUALNE  = foldDUALNE' (Option Nothing)
+foldDUALNE  = foldDUALNE' Nothing
   where
-    foldDUALNE' dacc lf _   _   _    _   (Leaf _ l)  = lf (option mempty id dacc) l
+    foldDUALNE' dacc lf _   _   _    _   (Leaf _ l)  = lf (maybe mempty id dacc) l
     foldDUALNE' _    _  lfU _   _    _   (LeafU _)   = lfU
     foldDUALNE' dacc lf lfU con down ann (Concat ts)
       = con (NEL.map (foldDUALNE' dacc lf lfU con down ann . snd . unpack) ts)
     foldDUALNE' dacc lf lfU con down ann (Act d t)
-      = down d (foldDUALNE' (dacc <> (Option (Just d))) lf lfU con down ann . snd . unpack $ t)
+      = down d (foldDUALNE' (dacc <> Just d) lf lfU con down ann . snd . unpack $ t)
     foldDUALNE' dacc lf lfU con down ann (Annot a t)
       = ann a (foldDUALNE' dacc lf lfU con down ann . snd . unpack $ t)
 
@@ -309,9 +309,9 @@ foldDUAL :: (Semigroup d, Monoid d)
          -> (d -> r -> r)          -- ^ Process an internal d node
          -> (a -> r -> r)          -- ^ Process an internal datum
          -> DUALTree d u a l -> Maybe r
-foldDUAL _ _ _ _ _ (DUALTree (Option Nothing))
+foldDUAL _ _ _ _ _ (DUALTree Nothing)
   = Nothing
-foldDUAL l u c d a (DUALTree (Option (Just (DUALTreeU (_, t)))))
+foldDUAL l u c d a (DUALTree (Just (DUALTreeU (_, t))))
   = Just $ foldDUALNE l u c d a t
 
 -- | A specialized fold provided for convenience: flatten a tree into
