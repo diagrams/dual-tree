@@ -9,7 +9,7 @@
 -- Rose (n-ary) trees with both upwards- (/i.e./ cached) and
 -- downwards-traveling (/i.e./ accumulating) monoidal annotations.
 -- This is used as the core data structure underlying the @diagrams@
--- framework (<http://projects.haskell.org/diagrams>), but potentially
+-- framework (<https://diagrams.github.io>), but potentially
 -- has other applications as well.
 --
 -- Abstractly, a DUALTree is a rose (n-ary) tree with data (of type
