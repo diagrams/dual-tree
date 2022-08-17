@@ -1,3 +1,8 @@
+* 0.2.3.1: 17 Aug 2022
+
+- Allow base-4.17 and test with GHC 9.4
+- Get rid of newtype-generics dependency
+
 * 0.2.3.0-r2: 11 Dec 2021
 
 - Allow base-4.16 and test with GHC 9.2
