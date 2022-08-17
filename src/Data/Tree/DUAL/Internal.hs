@@ -4,7 +4,6 @@
 {-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses      #-}
-{-# LANGUAGE TypeOperators              #-}
 {-# LANGUAGE TypeFamilies               #-}
 
 -----------------------------------------------------------------------------
@@ -276,7 +275,7 @@ foldDUALNE :: (Semigroup d, Monoid d)
            -> DUALTreeNE d u a l -> r
 foldDUALNE  = foldDUALNE' Nothing
   where
-    foldDUALNE' dacc lf _   _   _    _   (Leaf _ l)  = lf (maybe mempty id dacc) l
+    foldDUALNE' dacc lf _   _   _    _   (Leaf _ l)  = lf (fromMaybe mempty dacc) l
     foldDUALNE' _    _  lfU _   _    _   (LeafU _)   = lfU
     foldDUALNE' dacc lf lfU con down ann (Concat ts)
       = con (NEL.map (foldDUALNE' dacc lf lfU con down ann . snd . unpack) ts)
@@ -323,5 +322,5 @@ flatten = fromMaybe []
             (\d l -> [(l, d)])
             []
             (concat . NEL.toList)
-            (flip const)
+            (\_ x -> x)
             (const id)
