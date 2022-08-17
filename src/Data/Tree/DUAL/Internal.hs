@@ -58,8 +58,6 @@ import           Data.Monoid.Action
 import           Data.Semigroup
 import           Data.Typeable
 
-import           Control.Newtype.Generics
-
 ------------------------------------------------------------
 -- DUALTreeNE
 ------------------------------------------------------------
@@ -83,11 +81,6 @@ instance (Action d u, Semigroup u) => Semigroup (DUALTreeNE d u a l) where
 
 newtype DAct d = DAct { unDAct :: d }
 
-instance Newtype (DAct d) where
-  type O (DAct d) = d
-  pack   = DAct
-  unpack = unDAct
-
 instance (Semigroup d, Semigroup u, Action d u)
     => Action (DAct d) (DUALTreeNE d u a l) where
   act (DAct d) (Act d' t) = Act (d <> d') t
@@ -102,22 +95,22 @@ instance (Semigroup d, Semigroup u, Action d u)
 newtype DUALTreeU d u a l = DUALTreeU { unDUALTreeU :: (u, DUALTreeNE d u a l) }
   deriving (Functor, Semigroup, Typeable, Show, Eq)
 
-instance Newtype (DUALTreeU d u a l) where
-  type O (DUALTreeU d u a l) = (u, DUALTreeNE d u a l)
-  pack   = DUALTreeU
-  unpack = unDUALTreeU
+overDUALTreeU
+  :: ((u, DUALTreeNE d u a l) -> (u', DUALTreeNE d u' a l))
+  -> DUALTreeU d u a l -> DUALTreeU d u' a l
+overDUALTreeU f = DUALTreeU . f . unDUALTreeU
 
 instance (Semigroup d, Semigroup u, Action d u)
     => Action (DAct d) (DUALTreeU d u a l) where
-  act d = over DUALTreeU (act (unDAct d) *** act d)
+  act d = overDUALTreeU (act (unDAct d) *** act d)
 
 -- | \"Pull\" the root @u@ annotation out into a tuple.
 pullU :: (Semigroup u, Action d u) => DUALTreeNE d u a l -> DUALTreeU d u a l
-pullU t@(Leaf u _)                   = pack (u, t)
-pullU t@(LeafU u)                    = pack (u, t)
-pullU t@(Concat ts)                  = pack (sconcat . NEL.map (fst . unpack) $ ts, t)
-pullU t@(Act d (DUALTreeU (u,_)))    = pack (act d u, t)
-pullU t@(Annot _ (DUALTreeU (u, _))) = pack (u, t)
+pullU t@(Leaf u _)                   = DUALTreeU (u, t)
+pullU t@(LeafU u)                    = DUALTreeU (u, t)
+pullU t@(Concat ts)                  = DUALTreeU (sconcat . NEL.map (fst . unDUALTreeU) $ ts, t)
+pullU t@(Act d (DUALTreeU (u,_)))    = DUALTreeU (act d u, t)
+pullU t@(Annot _ (DUALTreeU (u, _))) = DUALTreeU (u, t)
 
 ------------------------------------------------------------
 -- DUALTree
@@ -151,10 +144,10 @@ pullU t@(Annot _ (DUALTreeU (u, _))) = pack (u, t)
 newtype DUALTree d u a l = DUALTree { unDUALTree :: Maybe (DUALTreeU d u a l) }
   deriving ( Functor, Semigroup, Typeable, Show, Eq )
 
-instance Newtype (DUALTree d u a l) where
-  type O (DUALTree d u a l) = Maybe (DUALTreeU d u a l)
-  pack   = DUALTree
-  unpack = unDUALTree
+overDUALTree
+  :: (Maybe (DUALTreeU d u a l) -> Maybe (DUALTreeU d u' a l))
+  -> DUALTree d u a l -> DUALTree d u' a l
+overDUALTree f = DUALTree . f . unDUALTree
 
 instance (Semigroup u, Action d u) => Monoid (DUALTree d u a l) where
   mempty  = DUALTree mempty
@@ -167,7 +160,7 @@ instance (Semigroup u, Action d u) => Monoid (DUALTree d u a l) where
 --   operationally @act@ incurs only a constant amount of work.
 instance (Semigroup d, Semigroup u, Action d u)
     => Action (DAct d) (DUALTree d u a l) where
-  act = over DUALTree . fmap . act
+  act = overDUALTree . fmap . act
 
 ------------------------------------------------------------
 -- Convenience methods etc.
@@ -203,7 +196,7 @@ applyUpost u t = t <> leafU u
 --   only works on /non-empty/ trees; on empty trees this function is
 --   the identity.
 annot :: (Semigroup u, Action d u) => a -> DUALTree d u a l -> DUALTree d u a l
-annot a = (over DUALTree . fmap) (pullU . Annot a)
+annot a = (overDUALTree . fmap) (pullU . Annot a)
 
 -- | Apply a @d@ annotation at the root of a tree, transforming all
 --   @u@ annotations by the action of @d@.
@@ -215,7 +208,7 @@ applyD = act . DAct
 --   top-level cached @u@ annotation paired with a non-empty
 --   DUAL-tree.
 nonEmpty :: DUALTree d u a l -> Maybe (u, DUALTreeNE d u a l)
-nonEmpty = fmap unpack . unpack
+nonEmpty = fmap unDUALTreeU . unDUALTree
 
 -- | Get the @u@ annotation at the root, or @Nothing@ if the tree is
 --   empty.
@@ -243,7 +236,7 @@ mapUNE f (Annot a t) = Annot a (mapUU f t)
 --   with the action of @d@) over all the @u@ annotations in a
 --   non-empty DUAL-tree paired with its cached @u@ value.
 mapUU :: (u -> u') -> DUALTreeU d u a l -> DUALTreeU d u' a l
-mapUU f = over DUALTreeU (f *** mapUNE f)
+mapUU f = overDUALTreeU (f *** mapUNE f)
 
 -- | Map a function over all the @u@ annotations in a DUAL-tree.  The
 --   function must be a monoid homomorphism, and must commute with the
@@ -257,7 +250,7 @@ mapUU f = over DUALTreeU (f *** mapUNE f)
 --     * @f (act d u) == act d (f u)@
 --
 mapU :: (u -> u') -> DUALTree d u a l -> DUALTree d u' a l
-mapU = over DUALTree . fmap . mapUU
+mapU = overDUALTree . fmap . mapUU
 
 ------------------------------------------------------------
 -- Folds
@@ -278,11 +271,11 @@ foldDUALNE  = foldDUALNE' Nothing
     foldDUALNE' dacc lf _   _   _    _   (Leaf _ l)  = lf (fromMaybe mempty dacc) l
     foldDUALNE' _    _  lfU _   _    _   (LeafU _)   = lfU
     foldDUALNE' dacc lf lfU con down ann (Concat ts)
-      = con (NEL.map (foldDUALNE' dacc lf lfU con down ann . snd . unpack) ts)
+      = con (NEL.map (foldDUALNE' dacc lf lfU con down ann . snd . unDUALTreeU) ts)
     foldDUALNE' dacc lf lfU con down ann (Act d t)
-      = down d (foldDUALNE' (dacc <> Just d) lf lfU con down ann . snd . unpack $ t)
+      = down d (foldDUALNE' (dacc <> Just d) lf lfU con down ann . snd . unDUALTreeU $ t)
     foldDUALNE' dacc lf lfU con down ann (Annot a t)
-      = ann a (foldDUALNE' dacc lf lfU con down ann . snd . unpack $ t)
+      = ann a (foldDUALNE' dacc lf lfU con down ann . snd . unDUALTreeU $ t)
 
 -- | Fold for DUAL-trees. It is given access to the internal and leaf
 --   data, internal @d@ values, and the accumulated @d@ values at each
