@@ -1,5 +1,5 @@
 name:                dual-tree
-version:             0.2.3.0
+version:             0.2.3.1
 synopsis:            Rose trees with cached and accumulating monoidal annotations
 description:         Rose (n-ary) trees with both upwards- (/i.e./
                      cached) and downwards-traveling (/i.e./
