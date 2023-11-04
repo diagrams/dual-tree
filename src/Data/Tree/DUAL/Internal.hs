@@ -79,7 +79,7 @@ instance (Action d u, Semigroup u) => Semigroup (DUALTreeNE d u a l) where
   t1 <> t2   = sconcat (NEL.fromList [t1,t2])
   sconcat    = Concat . NEL.map pullU
 
-newtype DAct d = DAct { unDAct :: d }
+newtype DAct d = DAct { unDAct :: d } deriving Semigroup
 
 instance (Semigroup d, Semigroup u, Action d u)
     => Action (DAct d) (DUALTreeNE d u a l) where
