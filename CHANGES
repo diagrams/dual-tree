@@ -1,3 +1,7 @@
+* 0.2.3.1-r4: 29 Jan 2025
+
+- Allow base-4.21 and test with GHC 9.12
+
 * 0.2.3.1-r3: 18 May 2023
 
 - Allow base-4.20 and test with GHC 9.10
