@@ -1,3 +1,7 @@
+* 0.2.3.1-r5: 13 May 2025
+
+- Allow monoid-extras-0.7
+
 * 0.2.3.1-r4: 29 Jan 2025
 
 - Allow base-4.21 and test with GHC 9.12
