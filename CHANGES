@@ -1,3 +1,16 @@
+* 0.2.3.2: 28 March 2026
+
+- Fix [#16](https://github.com/diagrams/dual-tree/issues/16): Contrary
+  to the documentation, `sconcat` often produced deeply nested trees,
+  rather than flat ones; the problem is that `sconcat` in auto-derived
+  `Semigroup` instances performs a fold with `(<>)`.  This version
+  manually reimplements the relevant `Semigroup` instances so that
+  `sconcat` now results in flat trees.  There is no semantic
+  difference, but this could conceivably lead to better performance in
+  cases where `sconcat` is being called on large lists of
+  trees. Thanks to [John Z.](https://github.com/machinedgod) for
+  reporting the issue.
+
 * 0.2.3.1-r5: 13 May 2025
 
 - Allow monoid-extras-0.7
