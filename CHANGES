@@ -1,3 +1,8 @@
+* 0.2.3.3: 31 March 2026
+
+- Fix [#17](https://github.com/diagrams/dual-tree/issues/17): Restore
+  compatibility with GHC <= 9.6.
+
 * 0.2.3.2: 28 March 2026
 
 - Fix [#16](https://github.com/diagrams/dual-tree/issues/16): Contrary
