@@ -58,7 +58,6 @@ module Data.Tree.DUAL.Internal (
 ) where
 
 import Control.Arrow ((***))
-import qualified Data.Functor as F
 import Data.List.NonEmpty (NonEmpty (..))
 import qualified Data.List.NonEmpty as NEL
 import Data.Maybe (catMaybes, fromMaybe)
@@ -119,7 +118,7 @@ newtype DUALTreeU d u a l = DUALTreeU {unDUALTreeU :: (u, DUALTreeNE d u a l)}
 --   into nested calls to '(<>)'.
 instance (Action d u, Semigroup u) => Semigroup (DUALTreeU d u a l) where
   DUALTreeU t1 <> DUALTreeU t2 = DUALTreeU (t1 <> t2)
-  sconcat = DUALTreeU . (sconcat *** sconcat) . F.unzip . fmap unDUALTreeU
+  sconcat = DUALTreeU . (sconcat *** sconcat) . NEL.unzip . fmap unDUALTreeU
 
 overDUALTreeU ::
   ((u, DUALTreeNE d u a l) -> (u', DUALTreeNE d u' a l)) ->
