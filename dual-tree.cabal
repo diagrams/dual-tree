@@ -59,5 +59,4 @@ test-suite test
                      QuickCheck,
                      testing-feat,
                      monoid-extras,
-                     semigroups,
                      dual-tree
